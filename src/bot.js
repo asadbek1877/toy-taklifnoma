@@ -21,11 +21,30 @@ const webAppUrl = [
 // Bot menyusidagi doimiy tugma — mehmon bosib saytni Telegram ichida ochadi,
 // ismi/nik avtomatik ketadi.
 if (webAppUrl) {
+  // DIQQAT: kutubxona ichma-ich obyektni o'zi JSON'ga aylantirmaydi (setMyCommands'dan farqli) —
+  // menu_button'ni o'zimiz stringify qilamiz, aks holda Telegram 400 qaytaradi.
   bot
     .setChatMenuButton({
-      menu_button: { type: 'web_app', text: 'Таклифнома 💌', web_app: { url: webAppUrl } },
+      menu_button: JSON.stringify({ type: 'web_app', text: 'Таклифнома 💌', web_app: { url: webAppUrl } }),
     })
+    .then(() => console.log('Menyu tugmasi o\'rnatildi:', webAppUrl))
     .catch((err) => console.error('Menyu tugmasini sozlashda xatolik:', err.message));
+
+  bot
+    .setMyCommands([{ command: 'start', description: 'Taklifnomani ochish 💌' }])
+    .catch((err) => console.error('Buyruqlarni sozlashda xatolik:', err.message));
+
+  // Yangi foydalanuvchi botni ochganda START tugmasi tepasida chiqadigan matn (tilga qarab)
+  const descriptions = {
+    '': "💍 To'y taklifnomalari boti. START ni bosing — o'z taklifnomangizni yarating yoki mehmon sifatida oching.",
+    ru: '💍 Бот свадебных приглашений. Нажмите START — создайте своё приглашение или откройте как гость.',
+    ja: '💍 結婚式の招待状ボット。START を押して、招待状を作成するかゲストとして開いてください。',
+  };
+  Object.entries(descriptions).forEach(([language_code, description]) => {
+    bot
+      .setMyDescription({ description, ...(language_code && { language_code }) })
+      .catch((err) => console.error('Tavsifni sozlashda xatolik:', err.message));
+  });
 }
 
 // Botning username'i (shaxsiy havola uchun): BOT_USERNAME env yoki Telegram getMe()
