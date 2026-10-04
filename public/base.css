@@ -1,0 +1,79 @@
+/* base.css — umumiy: safe-area, ko'rinishlar, yuklanish, tugmalar, toast, til almashtirgich */
+:root {
+  /* Safe area: Telegram (Bot API 8+) + iOS/Android env() */
+  --sa-top: calc(max(env(safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px)) + var(--tg-content-safe-area-inset-top, 0px));
+  --sa-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px));
+  --sa-left: max(env(safe-area-inset-left, 0px), var(--tg-safe-area-inset-left, 0px));
+  --sa-right: max(env(safe-area-inset-right, 0px), var(--tg-safe-area-inset-right, 0px));
+  --vh: var(--tg-viewport-stable-height, 100dvh);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* standart (ilova "chrome"i) ranglari — to'y temasidan mustaqil */
+  --accent: #b89443; --accent2: #8f6f2a; --accent-rgb: 184, 148, 67; --grad: linear-gradient(135deg, #d9bd78, #b89443 55%, #8f6f2a);
+  --paper: #fbf8f2; --paper-2: #f3ecdc; --ink: #2b2620; --soft: #6f6757;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ink); background: var(--paper); overflow: hidden; overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased; font-variant-numeric: lining-nums; -webkit-user-select: none; user-select: none;
+}
+input, textarea { -webkit-user-select: text; user-select: text; font: inherit; }
+button { font: inherit; cursor: pointer; color: inherit; }
+img { max-width: 100%; display: block; }
+[hidden] { display: none !important; }
+
+/* ko'rinishlar */
+.view { position: fixed; inset: 0; z-index: 5; display: none; height: var(--vh); }
+.view.is-active { display: block; animation: viewIn 0.5s var(--ease) both; }
+@keyframes viewIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.view-center { display: none; align-items: center; justify-content: center; padding: calc(var(--sa-top) + 24px) 20px calc(var(--sa-bottom) + 24px); }
+.view-center.is-active { display: flex; }
+
+/* yuklanish */
+.loader { position: absolute; inset: 0; display: grid; place-items: center; }
+.loader i { width: 46px; height: 46px; border-radius: 50%; border: 3px solid rgba(var(--accent-rgb), 0.2); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* shisha (glass) va kartalar */
+.glass { background: rgba(255, 255, 255, 0.62); -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5); border: 1px solid rgba(255, 255, 255, 0.8); box-shadow: 0 10px 34px rgba(80, 60, 20, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8); }
+.card { border-radius: 22px; padding: 20px 18px; }
+.center { text-align: center; }
+.muted { color: var(--soft); font-size: 13.5px; line-height: 1.5; }
+
+/* tugmalar */
+.btn { border: 0; border-radius: 14px; padding: 15px 20px; font-weight: 600; font-size: 14.5px; letter-spacing: 0.02em; transition: transform 0.15s var(--ease), box-shadow 0.25s, opacity 0.2s; width: 100%; text-align: center; }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.55; }
+.btn.primary { color: #fff; background: var(--grad); box-shadow: 0 10px 26px rgba(var(--accent-rgb), 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.btn.ghost { background: rgba(255, 255, 255, 0.55); border: 1px solid rgba(var(--accent-rgb), 0.5); color: var(--accent2); }
+.btn.small { padding: 11px 14px; font-size: 13px; border-radius: 12px; width: auto; }
+
+/* til almashtirgich */
+.lang-switch { position: fixed; z-index: 60; top: calc(var(--sa-top) + 10px); right: calc(var(--sa-right) + 12px); display: flex; gap: 2px; padding: 3px; border-radius: 999px; }
+.lang-switch button { border: 0; background: transparent; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; padding: 6px 10px; border-radius: 999px; color: var(--soft); transition: all 0.25s var(--ease); }
+.lang-switch button.on { background: var(--grad); color: #fff; }
+body[data-invdark='1'] .lang-switch { background: rgba(20, 20, 30, 0.45); border-color: rgba(255, 255, 255, 0.15); }
+body[data-invdark='1'] .lang-switch button { color: rgba(255, 255, 255, 0.7); }
+body.hide-lang .lang-switch { display: none; }
+
+/* xabar ko'rinishi / rol tanlash */
+.msg-card { max-width: 420px; width: 100%; text-align: center; padding: 30px 22px; }
+.msg-card .big { font-size: 52px; margin-bottom: 8px; }
+.msg-card h2 { font-size: 22px; margin-bottom: 8px; }
+.role-wrap { max-width: 440px; width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.role-title { font-size: 28px; line-height: 1.15; text-align: center; margin-bottom: 6px; font-weight: 700; }
+.role-card { width: 100%; text-align: left; border-radius: 22px; padding: 18px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; border: 0; transition: transform 0.2s var(--ease); }
+.role-card:active { transform: scale(0.98); }
+.role-card .ico { width: 54px; height: 54px; border-radius: 17px; display: grid; place-items: center; font-size: 27px; background: var(--grad); box-shadow: 0 8px 20px rgba(var(--accent-rgb), 0.35); }
+.role-card b { display: block; font-size: 17px; margin-bottom: 2px; }
+.role-card span.d { font-size: 12.5px; color: var(--soft); line-height: 1.4; }
+
+/* toast */
+#toasts { position: fixed; left: 0; right: 0; bottom: calc(var(--sa-bottom) + 96px); z-index: 300; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.toast { background: rgba(30, 28, 24, 0.92); color: #fff; padding: 11px 16px; border-radius: 14px; font-size: 13.5px; max-width: 86vw; animation: toastIn 0.35s var(--ease) both; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
+.toast.err { background: rgba(160, 50, 50, 0.95); }
+.toast.out { opacity: 0; transform: translateY(8px); transition: all 0.4s; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }

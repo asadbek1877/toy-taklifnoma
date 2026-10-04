@@ -1,6 +1,5 @@
-// Запуск:  node test/e2e-server.js            (pg-mem, быстро)
-//           USE_REAL_PG=1 node test/e2e-server.js   (настоящий PostgreSQL — рекомендуется перед деплоем)
-// Тестовый стенд: РЕАЛЬНЫЙ backend (src/index.js) + pg-mem вместо PostgreSQL + поддельный Telegram-бот
+// Ishga tushirish:  USE_REAL_PG=1 node test/e2e-server.js   (haqiqiy PostgreSQL — tavsiya)  yoki  node test/e2e-server.js (pg-mem)
+// Test stendi: РЕАЛЬНЫЙ backend (src/index.js) + pg-mem вместо PostgreSQL + поддельный Telegram-бот
 // с управляемыми сбоями (обрыв сети, 429, 403, зависание).
 const path = require('path');
 const crypto = require('crypto');
@@ -16,6 +15,10 @@ process.env.KEEP_ALIVE = 'false';
 process.env.BOT_USERNAME = 'toygabot';
 process.env.PORT = '3999';
 delete process.env.ALLOWED_ORIGIN;
+// AI: SDK ходит на поддельный сервер (FAKE_ANTHROPIC) вместо api.anthropic.com
+process.env.ANTHROPIC_API_KEY = 'test-key';
+process.env.ANTHROPIC_BASE_URL = 'http://localhost:3997';
+process.env.AI_DAILY_LIMIT = '6';
 // Быстрые тайминги worker'а для тестов
 process.env.OUTBOX_INTERVAL_MS = '300';
 process.env.OUTBOX_BACKOFF_BASE_MS = '200';
@@ -63,6 +66,11 @@ class FakeBot {
   setMyCommands(c) { sent.push({ method: 'setMyCommands', c }); return Promise.resolve(true); }
   setMyDescription(f) { sent.push({ method: 'setMyDescription', f }); return Promise.resolve(true); }
   getMe() { return Promise.resolve({ username: 'toygabot' }); }
+  sendDocument(chatId, buf, opts, fileOpts) {
+    attemptsLog.push({ chatId: String(chatId), t: Date.now(), mode: failMode });
+    sent.push({ chatId: String(chatId), document: true, filename: fileOpts && fileOpts.filename, text: opts && opts.caption, bytes: buf.length, content: buf.toString('utf8') });
+    return Promise.resolve({});
+  }
   sendMessage(chatId, text, opts) {
     attemptsLog.push({ chatId: String(chatId), t: Date.now(), mode: failMode });
     const applies = failMode !== 'off' && (!failChat || String(chatId) === String(failChat));
@@ -79,9 +87,41 @@ class FakeBot {
 }
 require.cache[require.resolve(ROOT + 'node_modules/node-telegram-bot-api')] = { exports: FakeBot, loaded: true, id: 'tgbot' };
 
-process.chdir(require('os').tmpdir()); // чтобы dotenv не подхватил боевой .env
+process.chdir(require('os').tmpdir()); // dotenv jangovar .env'ni olmasin
 require(ROOT + 'src/index.js');
 const realDb = require(ROOT + 'src/db.js');
+const reminders = require(ROOT + 'src/reminders.js');
+
+// ---- FAKE_ANTHROPIC: отвечает как /v1/messages, запоминает последний запрос ----
+let aiMode = 'ok'; // ok | auth | limit | refuse | badjson
+const aiRequests = [];
+http.createServer((req, res) => {
+  let body = '';
+  req.on('data', (c) => (body += c));
+  req.on('end', () => {
+    let json = {}; try { json = JSON.parse(body); } catch (e) {}
+    aiRequests.push({ url: req.url, headers: req.headers, body: json });
+    const send = (status, obj) => { res.statusCode = status; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(obj)); };
+    if (aiMode === 'auth') return send(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } });
+    if (aiMode === 'limit') return send(429, { type: 'error', error: { type: 'rate_limit_error', message: 'slow down' } });
+    const base = { id: 'msg_test', type: 'message', role: 'assistant', model: json.model, usage: { input_tokens: 10, output_tokens: 10 } };
+    if (aiMode === 'refuse') return send(200, { ...base, content: [], stop_reason: 'refusal', stop_details: { type: 'refusal', category: null } });
+    const structured = json.output_config && json.output_config.format;
+    let text;
+    if (structured) {
+      text = aiMode === 'badjson' ? 'not json' : JSON.stringify({
+        template: 't04', palette: 'midnight-gold', font: 'grand', intro: 'cinematic',
+        message: 'Sizni to\'yimizga taklif qilamiz', tagline: 'Ikki yurak — bitta hikoya',
+        story: [{ date: '2019', title: 'Birinchi uchrashuv', text: 'Hammasi shu yerdan boshlandi.' }],
+        schedule: [{ time: '14:00', title: 'Nikoh', text: 'Marosim', icon: '💍' }, { time: '25:99', title: 'Noto\'g\'ri vaqt', text: '', icon: '❌' }],
+        dress: { text: 'Klassik', colors: ['#112233', 'not-a-color'] },
+        menu: [{ title: 'Asosiy', items: ['Osh', 'Salat'] }],
+        custom: [{ title: 'Fotobudka', text: 'Kutamiz', emoji: '📸' }],
+      });
+    } else text = 'Aziz va Malika to\'yiga taklif — tayyor matn.';
+    send(200, { ...base, content: [{ type: 'text', text }], stop_reason: 'end_turn' });
+  });
+}).listen(3997);
 
 // --- управляющий сервер для тестов ---
 function sign(user, ageSec = 0) {
@@ -101,6 +141,8 @@ http.createServer(async (req, res) => {
       if (u.searchParams.get('username')) user.username = u.searchParams.get('username');
       return res.end(JSON.stringify({ initData: sign(user), user }));
     }
+    if (u.pathname === '/__ai') { if (u.searchParams.get('mode')) aiMode = u.searchParams.get('mode'); return res.end(JSON.stringify({ aiMode, last: aiRequests[aiRequests.length - 1] || null, count: aiRequests.length })); }
+    if (u.pathname === '/__remind') { const n = await reminders.runOnce(new Date(u.searchParams.get('now'))); return res.end(JSON.stringify({ queued: n })); }
     if (u.pathname === '/__all') return res.end(JSON.stringify(sent));
     if (u.pathname === '/__sent') return res.end(JSON.stringify(sent.filter((m) => m.chatId)));
     if (u.pathname === '/__attempts') return res.end(JSON.stringify(attemptsLog));

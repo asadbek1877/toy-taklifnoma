@@ -1,25 +1,26 @@
-// Bu fayl RSVP so'rovini qabul qiladi.
-//  • weddingCode bilan (Mini App): javob shu to'yning EGASIGA ketadi, mehmon Telegram imzosi bilan tekshiriladi.
-//  • weddingCode'siz (eski browser sayti): avvalgidek ADMIN_CHAT_ID'ga ketadi.
+// RSVP so'rovini qabul qiladi.
+//  • weddingCode (umumiy havola) yoki guestToken (shaxsiy havola) bilan — Mini App oqimi: javob to'yning BARCHA a'zolariga
+//    (egasi + hammuallif) ketadi; mehmon Telegram imzosi bilan tekshiriladi.
+//  • ikkalasisiz — eski (browser) oqim: ADMIN_CHAT_ID'ga.
 
 const express = require('express');
 const router = express.Router();
-const { saveRsvpDurable, getWeddingByCode } = require('../db');
+const { saveRsvpDurable } = require('../db');
+const store = require('../store');
+const notify = require('../notify');
 const { renderRsvpMessage } = require('../messages');
 const outbox = require('../outbox');
 const { verifyTelegramInitData } = require('../telegramAuth');
+const { cleanContent } = require('../validate');
 
 // POST /api/rsvp
-// { "guestName": "Aziz Karimov", "status": "yes", "guestCount": 2, "comment": "...",
-//   "weddingCode": "abc123", "clientId": "<uuid>", "tgInitData": "..." }
+// { guestName, status, guestCount, comment, language, weddingCode | guestToken, clientId, tgInitData }
 //
-// Ishonchlilik: javob va egasiga xabar bir tranzaksiyada saqlanadi (db.saveRsvpDurable), xabarni keyin
-// outbox worker yetkazadi (xato bo'lsa qayta urinadi). clientId — idempotentlik kaliti: ilova javobni
-// qayta yuborsa ham ikkinchi yozuv/xabar yaratilmaydi (javobda duplicate: true).
+// Ishonchlilik: javob va xabarlar bir tranzaksiyada saqlanadi (db.saveRsvpDurable), yetkazishni outbox worker bajaradi.
+// clientId — idempotentlik kaliti: qayta yuborilsa ikkinchi yozuv/xabar yaratilmaydi (duplicate: true).
 router.post('/', async (req, res) => {
-  const { guestName, status, guestCount, comment, language, weddingCode, clientId } = req.body;
+  const { guestName, status, guestCount, comment, language, weddingCode, guestToken, clientId } = req.body;
 
-  // Oddiy validatsiya — noto'g'ri ma'lumot bilan bazaga yozmaslik uchun
   if (!guestName || typeof guestName !== 'string' || guestName.trim().length === 0) {
     return res.status(400).json({ error: 'guestName majburiy' });
   }
@@ -39,32 +40,60 @@ router.post('/', async (req, res) => {
     clientId: clientId || null,
   };
 
-  // Sayt Telegram ichida ochilgan bo'lsa — yuboruvchining nikini imzodan tekshirib olamiz
   const tgUser = verifyTelegramInitData(req.body.tgInitData, process.env.TELEGRAM_BOT_TOKEN);
 
   try {
-    let wedding = null;
-    if (weddingCode) {
-      // Mini App oqimi: to'y bo'lishi va mehmon Telegram orqali kirgan bo'lishi shart
+    let wedding = null, guest = null;
+    if (guestToken || weddingCode) {
       if (!tgUser) return res.status(401).json({ error: 'Telegram orqali kiring' });
-      wedding = await getWeddingByCode(String(weddingCode));
-      if (!wedding) return res.status(404).json({ error: "To'y topilmadi" });
+
+      if (guestToken) {
+        guest = await store.getGuestByToken(String(guestToken));
+        wedding = guest && (await store.getWeddingRow(guest.wedding_id));
+      } else {
+        wedding = await store.getWeddingByCodeRow(String(weddingCode));
+        if (wedding && wedding.visibility === 'private') return res.status(403).json({ error: 'private' });
+      }
+      if (!wedding || !wedding.published) return res.status(404).json({ error: "To'y topilmadi" });
+
+      // Takroriy yuborishni (clientId bo'yicha) avval aniqlaymiz: muddati o'tgan bo'lsa ham oldingi javob qaytariladi
+      const content = cleanContent(store.hydrate(wedding).content).content;
+      const deadline = content.rsvp.deadline;
+      const closed = deadline && new Date().toISOString().slice(0, 10) > deadline;
+      if (closed && !(clientId && (await require('../db').pool.query('SELECT 1 FROM rsvp_responses WHERE client_id = $1', [clientId])).rows.length)) {
+        return res.status(409).json({ error: 'closed', deadline });
+      }
+
+      // Tarkib chegarasi: shaxsiy havolada — mehmonga ajratilgan joy; umumiyda — to'y sozlamasi
+      rsvp.guestCount = status === 'no' ? 1 : Math.min(rsvp.guestCount, guest ? guest.max_party : content.rsvp.maxParty);
       rsvp.weddingId = wedding.id;
       rsvp.guestTgId = tgUser.id;
       rsvp.guestUsername = tgUser.username || null;
+      rsvp.guestId = guest ? guest.id : null;
     }
 
-    // Kimga yuboriladi: to'y egasiga; eski (browser) oqimda — ADMIN_CHAT_ID'ga
-    const chatId = wedding ? wedding.owner_id : process.env.ADMIN_CHAT_ID;
     const title = wedding ? `${wedding.groom} & ${wedding.bride}` : null;
+    const adminChat = process.env.ADMIN_CHAT_ID;
+
+    // Kimga: to'yning barcha a'zolariga (sozlama o'chirmagan bo'lsa); eski oqimda — admin'ga
+    let recipients = [];
+    if (wedding) recipients = notify.wants(wedding, 'rsvp') ? (await store.listMembers(wedding.id)).map((m) => String(m.tg_id)) : [];
+    else if (adminChat) recipients = [adminChat];
 
     const { row, duplicate } = await saveRsvpDurable(rsvp, (saved) =>
-      chatId
-        ? { type: 'rsvp', chatId, parseMode: 'HTML', text: renderRsvpMessage(rsvp, tgUser, title, saved.id) }
-        : null
+      recipients.map((chatId) => ({
+        type: 'rsvp', chatId, parseMode: 'HTML',
+        dedupeKey: wedding ? `rsvp:${saved.id}:${chatId}` : `rsvp:${saved.id}`,
+        text: renderRsvpMessage(rsvp, tgUser, title, saved.id),
+      }))
     );
 
-    if (!duplicate) outbox.kick(); // yetkazishni darhol boshlaymiz (javobni kutdirmasdan)
+    if (!duplicate) {
+      outbox.kick();
+      if (wedding) {
+        await store.logEvent({ weddingId: wedding.id, guestId: rsvp.guestId, type: 'rsvp', tgId: tgUser.id, meta: { name: rsvp.guestName, status, count: rsvp.guestCount } });
+      }
+    }
     res.status(duplicate ? 200 : 201).json({ success: true, duplicate, data: row });
   } catch (err) {
     console.error('RSVP saqlashda xatolik:', err);

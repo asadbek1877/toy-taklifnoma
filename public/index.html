@@ -5,357 +5,99 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="color-scheme" content="light" />
   <meta name="theme-color" content="#fbf8f2" />
-  <title data-i18n="meta.title">Taklifnoma — Aziz & Malika</title>
+  <title>Taklifnoma</title>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Montserrat:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Montserrat:wght@300;400;500;600&display=swap" /></noscript>
-
-  <!-- Telegram Mini App SDK — head'da, sinxron: app.js ishga tushguncha tayyor bo'lsin -->
+  <!-- Telegram Mini App SDK: sinxron — keyingi skriptlar tayyor Telegram.WebApp'ni ko'radi -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-  <!-- Tezlik: backend manzili va taklifnoma ma'lumotini DARHOL so'raymiz (app.js yuklanishini kutmaymiz) -->
+  <!-- Tezlik: backend manzili va taklifnoma ma'lumotini DARHOL so'raymiz (qolgan skriptlar yuklanishini kutmaymiz) -->
   <script>
     (function () {
       var qs = new URLSearchParams(location.search);
       var isDev = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
       // Faqat localhost'da ?api=... bilan boshqa backend'ga ulanish mumkin (sinov uchun)
-      window.BACKEND_URL = (isDev && qs.get("api")) || "https://toy-taklifnoma.onrender.com";
+      window.BACKEND_URL = (isDev && qs.get('api')) || 'https://toy-taklifnoma.onrender.com';
       var tg = window.Telegram && window.Telegram.WebApp;
       var sp = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
-      var q = qs.get("w");
-      var code = q && /^[\w-]{4,32}$/.test(q) ? q : sp && /^w_[\w-]{4,32}$/.test(sp) ? sp.slice(2) : null;
-      if (!code) return;
-      window.__prefetch = {
-        code: code,
-        promise: fetch(window.BACKEND_URL + "/api/weddings/" + encodeURIComponent(code)).then(function (r) {
-          return r.json().catch(function () { return null; }).then(function (data) { return { ok: r.ok, status: r.status, data: data }; });
-        }),
-      };
-      window.__prefetch.promise.catch(function () {});
+      // ?w=<kod> (umumiy), ?g=<token> (shaxsiy), ?c=<token> (hammuallif); yoki to'g'ridan-to'g'ri startapp=w_/g_/c_
+      var key = null, kind = null;
+      ['w', 'g', 'c'].forEach(function (k) { var v = qs.get(k); if (!kind && v && /^[\w-]{4,40}$/.test(v)) { kind = k; key = v; } });
+      if (!kind && sp) { var m = /^([wgc])_([\w-]{4,40})$/.exec(sp); if (m) { kind = m[1]; key = m[2]; } }
+      window.__entry = { kind: kind, key: key };
+      if (kind === 'w' || kind === 'g') {
+        window.__prefetch = {
+          kind: kind, key: key,
+          promise: fetch(window.BACKEND_URL + '/api/invite/' + kind + '/' + encodeURIComponent(key)).then(function (r) {
+            return r.json().catch(function () { return null; }).then(function (data) { return { ok: r.ok, status: r.status, data: data }; });
+          }),
+        };
+        window.__prefetch.promise.catch(function () {});
+      }
     })();
   </script>
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="base.css" />
+  <link rel="stylesheet" href="invite.css" />
 </head>
-
 <body>
-  <!-- ============ FON: gradient orb'lar + zarralar ============ -->
-  <div class="bg" aria-hidden="true">
-    <span class="orb orb-1"></span>
-    <span class="orb orb-2"></span>
-    <span class="orb orb-3"></span>
-    <span class="bg-grain"></span>
+  <!-- Til almashtirgich (hamma ko'rinishda) -->
+  <div class="lang-switch glass" id="lang-switch" role="group" aria-label="Language">
+    <button type="button" data-lang="uz">UZ</button>
+    <button type="button" data-lang="ru">RU</button>
+    <button type="button" data-lang="ja">JA</button>
   </div>
 
-  <!-- ============ KO'RINISHLAR ============ -->
-  <div class="view is-active" id="view-loading"><div class="loader" aria-hidden="true">♥</div></div>
+  <!-- Yuklanmoqda -->
+  <div class="view is-active" id="v-loading"><div class="loader"><i></i></div></div>
 
-  <!-- Xabar (xato / mehmon uchun eslatma) -->
-  <div class="view" id="view-message">
-    <div class="view-scroll center-v">
-      <div class="card glass">
-        <div class="big-ico" aria-hidden="true">💌</div>
-        <h2 id="msg-title"></h2>
-        <p class="muted" id="msg-text"></p>
-      </div>
+  <!-- Xabar (xato / private / topilmadi) -->
+  <div class="view view-center" id="v-message">
+    <div class="card glass msg-card">
+      <div class="big" id="msg-ico">💌</div>
+      <h2 id="msg-title"></h2>
+      <p class="muted" id="msg-text"></p>
+      <button class="btn ghost" id="msg-btn" type="button" hidden style="margin-top:18px"></button>
     </div>
   </div>
 
-  <!-- Rol tanlash: egasi yoki mehmon -->
-  <div class="view" id="view-role">
-    <div class="view-scroll center-v">
+  <!-- Rol tanlash -->
+  <div class="view view-center" id="v-role">
+    <div class="role-wrap">
       <h1 class="role-title" data-i18n="role.title">To'y egasimisiz yoki mehmon?</h1>
-      <button type="button" class="role-card glass-strong" id="role-owner">
-        <span class="r-ico" aria-hidden="true">💍</span>
-        <span><b data-i18n="role.owner">Men to'y egasiman</b><span class="d" data-i18n="role.ownerDesc">Taklifnoma yarating va mehmonlarga yuboring</span></span>
+      <button type="button" class="role-card glass" id="role-owner">
+        <span class="ico">💍</span>
+        <span><b data-i18n="role.owner">Men to'y egasiman</b><span class="d" id="role-owner-d" data-i18n="role.ownerDesc">Taklifnoma yarating va mehmonlarga yuboring</span></span>
       </button>
-      <button type="button" class="role-card glass-strong" id="role-guest">
-        <span class="r-ico" aria-hidden="true">🥂</span>
+      <button type="button" class="role-card glass" id="role-guest">
+        <span class="ico">🥂</span>
         <span><b data-i18n="role.guest">Men mehmonman</b><span class="d" data-i18n="role.guestDesc">Taklifnoma havolasi orqali oching</span></span>
       </button>
     </div>
   </div>
 
-  <!-- Egasi kabineti -->
-  <div class="view" id="view-owner">
-    <div class="view-scroll">
-      <h2 class="screen-title" data-i18n="owner.title">Mening to'yim</h2>
-      <div class="card glass">
-        <span class="label" data-i18n="owner.link">Mehmonlar uchun havola</span>
-        <div class="link-box" id="owner-link" style="margin:10px 0 12px"></div>
-        <div class="row2">
-          <button type="button" class="btn btn-ghost small" id="owner-copy"><span data-i18n="owner.copy">Nusxalash</span></button>
-          <button type="button" class="btn btn-gold small" id="owner-share"><span data-i18n="owner.share">Mehmonlarga yuborish</span></button>
-        </div>
-      </div>
-      <div class="row2">
-        <button type="button" class="btn btn-ghost small" id="owner-edit"><span data-i18n="owner.edit">Tahrirlash</span></button>
-        <button type="button" class="btn btn-ghost small" id="owner-preview"><span data-i18n="owner.preview">Ko'rib chiqish</span></button>
-      </div>
-      <h2 class="screen-title" style="font-size:26px" data-i18n="owner.guests">Mehmonlar javoblari</h2>
-      <div class="stats">
-        <div class="stat glass"><b id="st-yes">0</b><small data-i18n="guests.coming">Keladi</small></div>
-        <div class="stat glass"><b id="st-people">0</b><small data-i18n="guests.people">kishi</small></div>
-        <div class="stat glass"><b id="st-no">0</b><small data-i18n="guests.declined">Kelmaydi</small></div>
-      </div>
-      <div class="glass guest-list" id="guest-list"></div>
+  <!-- Hammuallif taklifini qabul qilish -->
+  <div class="view view-center" id="v-cohost">
+    <div class="card glass msg-card">
+      <div class="big">💑</div>
+      <h2 data-i18n="cohost.title">Hammuallif taklifi</h2>
+      <p class="muted" id="cohost-text"></p>
+      <button class="btn primary" id="cohost-accept" type="button" style="margin-top:18px" data-i18n="cohost.accept">Qabul qilish</button>
+      <p class="form-msg" id="cohost-err" hidden></p>
     </div>
   </div>
 
-  <!-- Muharrir: dizayn + ma'lumotlar -->
-  <div class="view" id="view-editor">
-    <div class="view-scroll">
-      <h2 class="screen-title" data-i18n="editor.title">Taklifnoma</h2>
-      <form id="editor-form" class="card glass form" novalidate>
-        <div class="field">
-          <span class="label" data-i18n="editor.design">Dizayn</span>
-          <div class="designs" id="designs">
-            <button type="button" class="design is-active" data-design="gold"><i></i><span data-i18n="design.gold">Oltin</span></button>
-            <button type="button" class="design" data-design="rose"><i></i><span data-i18n="design.rose">Atirgul</span></button>
-            <button type="button" class="design" data-design="sage"><i></i><span data-i18n="design.sage">Zaytun</span></button>
-          </div>
-        </div>
-        <div class="field"><label for="e-groom" data-i18n="editor.groom">Kuyov ismi</label><input type="text" id="e-groom" maxlength="60" autocomplete="off" /></div>
-        <div class="field"><label for="e-bride" data-i18n="editor.bride">Kelin ismi</label><input type="text" id="e-bride" maxlength="60" autocomplete="off" /></div>
-        <div class="field"><label for="e-date" data-i18n="editor.date">To'y sanasi</label><input type="date" id="e-date" /></div>
-        <div class="row2">
-          <div class="field"><label for="e-nikoh" data-i18n="editor.nikoh">Nikoh vaqti</label><input type="time" id="e-nikoh" value="14:00" /></div>
-          <div class="field"><label for="e-banquet" data-i18n="editor.banquet">Ziyofat vaqti</label><input type="time" id="e-banquet" value="18:00" /></div>
-        </div>
-        <div class="field"><label for="e-venue" data-i18n="editor.venue">Joy nomi</label><input type="text" id="e-venue" maxlength="120" autocomplete="off" /></div>
-        <div class="field"><label for="e-address" data-i18n="editor.address">Manzil</label><input type="text" id="e-address" maxlength="200" autocomplete="off" /></div>
-        <div class="field"><label for="e-map" data-i18n="editor.map">Xaritada qidiruv (Google Maps)</label><input type="text" id="e-map" maxlength="200" autocomplete="off" /></div>
-        <div class="field"><label for="e-message" data-i18n="editor.message">Taklif matni (ixtiyoriy)</label><textarea id="e-message" rows="3" maxlength="400"></textarea></div>
-        <div class="field">
-          <span class="label" data-i18n="editor.photo">Juftlik fotosi</span>
-          <div class="photo-pick">
-            <div class="photo-thumb" id="e-photo-thumb">📷</div>
-            <button type="button" class="btn btn-ghost small" id="e-photo-btn" style="width:auto;flex:1"><span data-i18n="editor.photoPick">Foto tanlash</span></button>
-            <input type="file" id="e-photo" accept="image/*" hidden />
-          </div>
-        </div>
-        <button type="submit" class="btn btn-gold" id="editor-save" data-i18n="editor.save">Saqlash va havola olish</button>
-        <p class="form-msg" id="editor-msg" role="status" aria-live="polite" hidden></p>
-      </form>
-    </div>
-  </div>
+  <!-- Taklifnoma (mehmon) -->
+  <div class="view" id="v-invite"></div>
 
-  <!-- ============ TAKLIFNOMA (mehmon ko'radi) ============ -->
-  <div class="view view-invite" id="view-invite">
-  <!-- ============ KONVERT (INTRO) ============ -->
-  <div id="intro" class="intro">
-    <div class="intro-photo" aria-hidden="true"></div>
-    <div class="intro-inner">
-      <button type="button" id="envelope" class="envelope" aria-label="Open invitation">
-        <div class="envelope-back"></div>
-        <div class="envelope-letter-peek"></div>
-        <div class="envelope-body"></div>
-        <div class="envelope-flap"></div>
-        <div class="envelope-heart">♥</div>
-      </button>
-      <p class="envelope-hint" data-i18n="envelope.hint">Konvertni ochish uchun bosing</p>
-    </div>
-  </div>
-
-  <!-- ============ ILOVA ============ -->
-  <div class="app" id="app">
-    <!-- ============ EKRAN: BOSH SAHIFA ============ -->
-    <section class="screen is-active" data-screen="home">
-      <div class="screen-inner stagger">
-        <div class="hero glass-strong">
-          <video class="hero-video" id="hero-video" muted loop playsinline preload="none" aria-hidden="true"></video>
-          <div class="hero-content">
-            <p class="eyebrow" data-i18n="letter.pretitle">Taklifnoma</p>
-            <div class="photo-ring no-photo" id="photo-ring">
-              <img alt="" id="couple-photo" />
-              <span class="monogram" aria-hidden="true">A<i>♥</i>M</span>
-            </div>
-            <p class="lead" data-i18n="letter.invite">Sizni to'yimizga taklif qilamiz</p>
-            <h1 class="names">
-              <span id="inv-groom">Aziz</span>
-              <em data-i18n="letter.and">va</em>
-              <span id="inv-bride">Malika</span>
-            </h1>
-            <p class="date-line" id="wedding-date-str"></p>
-            <p class="sub" data-i18n="letter.subtitle">birga bo'lgan kunimizni biz bilan nishonlang</p>
-            <p class="sub inv-message" id="inv-message" hidden></p>
-          </div>
-        </div>
-
-        <div class="card glass">
-          <h2 class="card-title" data-i18n="countdown.title">To'yga qoldi</h2>
-          <div class="countdown" id="countdown">
-            <div class="cd"><b id="cd-days">0</b><small data-i18n="countdown.days">kun</small></div>
-            <div class="cd"><b id="cd-hours">00</b><small data-i18n="countdown.hours">soat</small></div>
-            <div class="cd"><b id="cd-minutes">00</b><small data-i18n="countdown.minutes">daqiqa</small></div>
-            <div class="cd"><b id="cd-seconds">00</b><small data-i18n="countdown.seconds">soniya</small></div>
-          </div>
-          <p class="countdown-over" id="countdown-over" data-i18n="countdown.over" hidden>Bugun — bizning kunimiz!</p>
-        </div>
-
-        <button type="button" class="btn btn-gold" data-go="rsvp">
-          <span data-i18n="hero.cta">Javob berish</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- ============ EKRAN: DASTUR + DRESS-CODE ============ -->
-    <section class="screen" data-screen="program">
-      <div class="screen-inner stagger">
-        <h2 class="screen-title" data-i18n="program.title">Kun dasturi</h2>
-
-        <div class="timeline">
-          <div class="tl-item glass" id="prog-nikoh">
-            <span class="tl-time" id="prog-nikoh-time">14:00</span>
-            <div>
-              <h3 data-i18n="program.nikoh.name">Nikoh to'yi</h3>
-              <p data-i18n="program.nikoh.desc">Nikoh marosimi va oilaviy tantana</p>
-            </div>
-            <span class="tl-ico" aria-hidden="true">💍</span>
-          </div>
-          <div class="tl-item glass" id="prog-banquet">
-            <span class="tl-time" id="prog-banquet-time">18:00</span>
-            <div>
-              <h3 data-i18n="program.banquet.name">Ziyofat</h3>
-              <p data-i18n="program.banquet.desc">Kechki bazm, musiqa va raqslar</p>
-            </div>
-            <span class="tl-ico" aria-hidden="true">🥂</span>
-          </div>
-        </div>
-
-        <div class="card glass">
-          <h2 class="card-title" data-i18n="dress.title">Kiyim uslubi</h2>
-          <p class="muted" data-i18n="dress.desc">Bayramona uslub. Quyidagi ranglar bizni juda xursand qiladi:</p>
-          <div class="palette">
-            <div class="swatch"><i style="background:#f3efe7"></i><span data-i18n="dress.c1">Marvarid</span></div>
-            <div class="swatch"><i style="background:#c9a95c"></i><span data-i18n="dress.c2">Tilla</span></div>
-            <div class="swatch"><i style="background:#e9dcc3"></i><span data-i18n="dress.c3">Qaymoq</span></div>
-            <div class="swatch"><i style="background:#7d7a4e"></i><span data-i18n="dress.c4">Zaytun</span></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ EKRAN: MANZIL ============ -->
-    <section class="screen" data-screen="venue">
-      <div class="screen-inner stagger">
-        <h2 class="screen-title" data-i18n="venue.title">Manzil</h2>
-        <div class="card glass">
-          <p class="venue-name" id="venue-name" data-i18n="venue.name">«Grand Palace» to'yxonasi</p>
-          <p class="muted" id="venue-address" data-i18n="venue.address">Toshkent sh., Amir Temur ko'chasi 1-uy</p>
-          <div class="map-wrap">
-            <iframe id="venue-map" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-          </div>
-          <button type="button" class="btn btn-ghost" id="venue-link">
-            <span data-i18n="venue.map">Xaritada ochish</span>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ EKRAN: RSVP ============ -->
-    <section class="screen" data-screen="rsvp">
-      <div class="screen-inner stagger">
-        <h2 class="screen-title" data-i18n="rsvp.title">Kelasizmi?</h2>
-        <p class="muted center" data-i18n="rsvp.desc">Iltimos, 1-noyabrgacha javob bering</p>
-
-        <form id="rsvp-form" class="card glass form" novalidate>
-          <div class="field">
-            <label for="guestName" data-i18n="rsvp.name">Ism va familiya</label>
-            <input type="text" id="guestName" name="guestName" autocomplete="name" enterkeyhint="done"
-                   data-i18n-placeholder="rsvp.namePlaceholder" placeholder="Masalan, Aziz Karimov" />
-          </div>
-
-          <div class="field">
-            <span class="label" data-i18n="rsvp.status">Javobingiz</span>
-            <div class="seg" role="radiogroup" aria-label="RSVP status">
-              <button type="button" class="seg-btn" data-status="yes" role="radio" aria-checked="false">
-                <span data-i18n="rsvp.yes">Ha, kelaman</span>
-              </button>
-              <button type="button" class="seg-btn" data-status="no" role="radio" aria-checked="false">
-                <span data-i18n="rsvp.no">Afsuski, yo'q</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="field" id="count-field">
-            <label for="guestCount" data-i18n="rsvp.count">Mehmonlar soni</label>
-            <div class="stepper">
-              <button type="button" id="count-minus" aria-label="-">−</button>
-              <input type="number" id="guestCount" min="1" max="20" value="1" inputmode="numeric" />
-              <button type="button" id="count-plus" aria-label="+">+</button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label for="comment" data-i18n="rsvp.comment">Izoh (ixtiyoriy)</label>
-            <textarea id="comment" rows="3" data-i18n-placeholder="rsvp.commentPlaceholder"
-                      placeholder="Tilaklaringiz yoki savollaringiz..."></textarea>
-          </div>
-
-          <p class="tg-hint" id="tg-hint" data-i18n="rsvp.tgHint" hidden>Telegram profilingiz javobga avtomatik qo'shiladi</p>
-
-          <!-- Telegram ichida bu tugma yashirinadi — o'rniga Telegramning MainButton'i ishlatiladi -->
-          <button type="submit" class="btn btn-gold" id="rsvp-submit" data-i18n="rsvp.submit">Javobni yuborish</button>
-
-          <p class="form-msg" id="form-msg" role="status" aria-live="polite" hidden></p>
-        </form>
-
-        <div class="card glass success" id="rsvp-success" hidden>
-          <div class="success-ico" aria-hidden="true">💛</div>
-          <p class="success-text" id="success-text"></p>
-          <p class="delivery" id="rsvp-delivery" role="status" aria-live="polite"></p>
-          <button type="button" class="btn btn-ghost" id="rsvp-another">
-            <span data-i18n="rsvp.another">Yana bir javob yuborish</span>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ PASTKI NAVIGATSIYA ============ -->
-    <nav class="tabbar glass-strong" id="tabbar" aria-label="Navigation">
-      <button type="button" class="tab is-active" data-go="home">
-        <svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>
-        <span data-i18n="tab.home">Bosh sahifa</span>
-      </button>
-      <button type="button" class="tab" data-go="program">
-        <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>
-        <span data-i18n="tab.program">Dastur</span>
-      </button>
-      <button type="button" class="tab" data-go="venue" id="tab-venue">
-        <svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
-        <span data-i18n="tab.venue">Manzil</span>
-      </button>
-      <button type="button" class="tab" data-go="rsvp">
-        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
-        <span data-i18n="tab.rsvp">Javob</span>
-      </button>
-    </nav>
-
-    <div class="preview-bar glass" id="preview-bar" hidden><span data-i18n="preview.banner">Ko'rib chiqish</span><button type="button" id="preview-close" data-i18n-title="preview.close" aria-label="Close">✕</button></div>
-
-    <!-- Musiqa -->
-    <button type="button" id="music-toggle" class="music-toggle glass" aria-pressed="false"
-            data-i18n-title="music.on" title="Musiqani yoqish">
-      <span class="music-icon">🔇</span>
-    </button>
-    <audio id="bg-music" src="assets/music.mp3" loop preload="none"></audio>
-  </div>
-
-  </div><!-- /view-invite -->
-
-  <!-- Til tanlagich (barcha ko'rinishlarda) -->
-  <div class="lang-switch glass" role="group" aria-label="Language">
-    <button type="button" class="lang-btn" data-lang="uz">UZ</button>
-    <button type="button" class="lang-btn" data-lang="ru">RU</button>
-    <button type="button" class="lang-btn" data-lang="ja">JA</button>
-  </div>
+  <!-- Egasi kabineti (owner.js yuklangach to'ldiriladi) -->
+  <div class="view" id="v-owner"></div>
 
   <!-- Faqat localhost'da ?mock bilan ishlaydi (brauzerda Telegram'siz sinash uchun) -->
   <script src="dev-mock.js"></script>
   <script src="i18n.js"></script>
+  <script src="templates.js"></script>
+  <script src="core.js"></script>
+  <script src="invite.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

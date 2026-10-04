@@ -36,9 +36,10 @@ const CFG = {
 // ---------- yozish ----------
 // `db` — pool YOKI tranzaksiya ichidagi client (shunda biznes ma'lumot bilan birga atomik yoziladi).
 // Bir xil dedupeKey ikkinchi marta yozilmaydi (dubl yo'q). Yangi qator id'sini yoki null (dubl) qaytaradi.
-async function enqueue(db, { type, chatId, text, parseMode = 'HTML', dedupeKey }) {
+// document: { filename, contentBase64 } berilsa — matn sarlavha (caption) bo'lib, fayl sifatida yuboriladi.
+async function enqueue(db, { type, chatId, text, parseMode = 'HTML', dedupeKey, document = null, replyMarkup = null }) {
   if (!dedupeKey) throw new Error('outbox.enqueue: dedupeKey majburiy');
-  const payload = JSON.stringify({ text, parseMode });
+  const payload = JSON.stringify({ text, parseMode, document, replyMarkup });
   const r = await db.query(
     `INSERT INTO outbox (type, chat_id, payload, dedupe_key)
      VALUES ($1, $2, $3, $4)
@@ -79,6 +80,7 @@ function withTimeout(promise, ms) {
 // ---------- worker ----------
 let pool = null;
 let send = null;       // async (chatId, text, { parse_mode }) => ...
+let sendDoc = null;    // async (chatId, Buffer, options, fileOptions) => ...
 let timer = null;
 let cleanupTimer = null;
 let ticking = false;
@@ -109,9 +111,14 @@ async function claimDue(now) {
 }
 
 async function deliver(row) {
-  const { text, parseMode } = JSON.parse(row.payload);
+  const { text, parseMode, document, replyMarkup } = JSON.parse(row.payload);
   try {
-    await withTimeout(send(row.chat_id, text, parseMode ? { parse_mode: parseMode } : {}), CFG.sendTimeoutMs);
+    const opts = parseMode ? { parse_mode: parseMode } : {};
+    if (replyMarkup) opts.reply_markup = replyMarkup;
+    const call = document && sendDoc
+      ? sendDoc(row.chat_id, Buffer.from(document.contentBase64, 'base64'), { ...opts, caption: text }, { filename: document.filename, contentType: 'text/csv' })
+      : send(row.chat_id, text, opts);
+    await withTimeout(call, document ? CFG.sendTimeoutMs * 2 : CFG.sendTimeoutMs);
   } catch (err) {
     const c = classify(err);
     const exhausted = c.kind === 'retry' && row.attempts >= CFG.maxAttempts;
@@ -172,8 +179,8 @@ async function cleanup() {
 }
 
 // pool — pg Pool; ready — migratsiya Promise'i; sender — Telegram'ga yuboruvchi funksiya
-function startWorker({ pool: p, ready, sender }) {
-  pool = p; send = sender; stopped = false;
+function startWorker({ pool: p, ready, sender, documentSender = null }) {
+  pool = p; send = sender; sendDoc = documentSender; stopped = false;
   Promise.resolve(ready).then(() => {
     tick(); // qayta ishga tushganda oldingi pending/qotib qolganlarni darhol davom ettiradi
     timer = setInterval(tick, CFG.intervalMs);

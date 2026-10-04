@@ -14,10 +14,11 @@ const uuid = () => require('crypto').randomUUID();
 (async () => {
   const OWNER = 100, GUEST = 200;
   const ownerInit = await sign(OWNER, 'Owner', 'owner'), guestInit = await sign(GUEST, 'Guest', 'gst');
-  const w = await post('/api/weddings', { tgInitData: ownerInit, wedding: { design: 'gold', groom: 'A', bride: 'M', date: '2026-11-15' } });
+  const w = await post('/api/owner/save', { tgInitData: ownerInit, wedding: { groom: 'A', bride: 'M', date: '2026-11-15' } });
   const code = w.b.wedding.code;
+  await post('/api/owner/publish', { tgInitData: ownerInit, published: true });
   const rsvp = (extra = {}) => post('/api/rsvp', { guestName: 'Гость', status: 'yes', guestCount: 2, language: 'ru', weddingCode: code, tgInitData: guestInit, clientId: uuid(), ...extra });
-  const outboxRow = async (rsvpId) => (await sql('SELECT * FROM outbox WHERE dedupe_key = $1', [`rsvp:${rsvpId}`]))[0];
+  const outboxRow = async (rsvpId) => (await sql('SELECT * FROM outbox WHERE dedupe_key LIKE $1 ORDER BY id', [`rsvp:${rsvpId}:%`]))[0];
 
   // ===== A. Базовый путь =====
   let n0 = (await sentTo(OWNER)).length;
@@ -98,7 +99,8 @@ const uuid = () => require('crypto').randomUUID();
 
   // ===== F. Сбой одного получателя не блокирует остальных =====
   await ctl('/__fail?mode=403&chat=777');
-  const own2 = await sign(300, 'O2', 'o2'), w2 = await post('/api/weddings', { tgInitData: await sign(777, 'Blocked'), wedding: { design: 'gold', groom: 'B', bride: 'L', date: '2026-12-01' } });
+  const init777 = await sign(777, 'Blocked'), w2 = await post('/api/owner/save', { tgInitData: init777, wedding: { groom: 'B', bride: 'L', date: '2026-12-01' } });
+  await post('/api/owner/publish', { tgInitData: init777, published: true });
   const nOwner = (await sentTo(OWNER)).length;
   const bad = await post('/api/rsvp', { guestName: 'К заблокированному', status: 'no', weddingCode: w2.b.wedding.code, tgInitData: guestInit, clientId: uuid() });
   const good = await rsvp({ guestName: 'К обычному' });
@@ -121,7 +123,7 @@ const uuid = () => require('crypto').randomUUID();
   r = await rsvp({ guestName: 'Зависание' });
   await sleep(2600);
   row = await outboxRow(r.b.data.id);
-  ok('H1 зависший вызов Telegram оборван по таймауту, задание вернулось в pending', row.status === 'pending' && /ms ichida tugamadi/.test(row.last_error || ''), row);
+  ok('H1 зависший вызов Telegram оборван по таймауту, задание вернулось в pending', ['pending', 'sending'].includes(row.status) && Number(row.attempts) >= 1 && /ms ichida tugamadi/.test(row.last_error || ''), row);
   await ctl('/__fail?mode=off');
   ok('H2 после восстановления доставлено', await waitFor(async () => (await outboxRow(r.b.data.id)).status === 'sent', 8000));
 

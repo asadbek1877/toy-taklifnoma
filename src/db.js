@@ -1,7 +1,6 @@
 // Bu fayl bazaga ulanishni sozlaydi va bazaga yozish/o'qish funksiyalarini beradi.
 // Boshqa fayllar bevosita SQL yozmaydi — shu yerdagi funksiyalarni chaqiradi.
 
-const crypto = require('crypto');
 const { Pool } = require('pg');
 const outbox = require('./outbox');
 
@@ -80,6 +79,111 @@ async function migrate() {
       sent_at TIMESTAMPTZ
     )`);
   await pool.query('CREATE INDEX IF NOT EXISTS idx_outbox_due ON outbox (status, next_attempt_at)');
+
+  // ================= v2: to'liq mahsulot (shablonlar, kontent, media, mehmonlar, analitika) =================
+  // Barcha o'zgarishlar IF NOT EXISTS / ADD COLUMN IF NOT EXISTS — eski ma'lumotlar saqlanadi.
+  await pool.query("ALTER TABLE weddings ADD COLUMN IF NOT EXISTS template TEXT NOT NULL DEFAULT 't01'");
+  await pool.query('ALTER TABLE weddings ADD COLUMN IF NOT EXISTS theme TEXT');           // JSON: {id,bg,surface,ink,soft,accent,accent2}
+  await pool.query("ALTER TABLE weddings ADD COLUMN IF NOT EXISTS font TEXT NOT NULL DEFAULT 'classic'");
+  await pool.query('ALTER TABLE weddings ADD COLUMN IF NOT EXISTS content TEXT');         // JSON: bo'limlar (hikoya, dastur, menyu, galereya...)
+  await pool.query("ALTER TABLE weddings ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public'"); // public | private
+  await pool.query('ALTER TABLE weddings ADD COLUMN IF NOT EXISTS published BOOLEAN');
+  await pool.query('ALTER TABLE weddings ADD COLUMN IF NOT EXISTS settings TEXT');        // JSON: eslatmalar, bildirishnomalar
+  // Avval yaratilgan to'ylar allaqachon mehmonlarga yuborilgan — ular e'lon qilingan hisoblanadi
+  await pool.query('UPDATE weddings SET published = TRUE WHERE published IS NULL');
+
+  // A'zolar: egasi va hammuallif (co-host). Bir foydalanuvchi — bitta to'y.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS wedding_members (
+      id SERIAL PRIMARY KEY,
+      wedding_id INTEGER NOT NULL,
+      tg_id BIGINT NOT NULL UNIQUE,
+      role TEXT NOT NULL CHECK (role IN ('owner', 'cohost')),
+      name TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_members_wedding ON wedding_members (wedding_id)');
+  await pool.query(`
+    INSERT INTO wedding_members (wedding_id, tg_id, role, name)
+    SELECT w.id, w.owner_id, 'owner', w.owner_name FROM weddings w
+     WHERE NOT EXISTS (SELECT 1 FROM wedding_members m WHERE m.tg_id = w.owner_id)`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cohost_invites (
+      token TEXT PRIMARY KEY,
+      wedding_id INTEGER NOT NULL,
+      created_by BIGINT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_by BIGINT,
+      used_at TIMESTAMPTZ
+    )`);
+
+  // Media: foto, video, musiqa — bazada (Render diski vaqtinchalik, baza doimiy)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS media (
+      id TEXT PRIMARY KEY,
+      wedding_id INTEGER NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('image', 'video', 'audio')),
+      mime TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      data BYTEA NOT NULL,
+      thumb BYTEA,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_media_wedding ON media (wedding_id)');
+
+  // Mehmonlar va guruhlar
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS guest_groups (
+      id SERIAL PRIMARY KEY,
+      wedding_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      emoji TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (wedding_id, name)
+    )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS guests (
+      id SERIAL PRIMARY KEY,
+      wedding_id INTEGER NOT NULL,
+      group_id INTEGER,
+      name TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      max_party INTEGER NOT NULL DEFAULT 1,
+      phone TEXT,
+      note TEXT,
+      tg_id BIGINT,
+      open_count INTEGER NOT NULL DEFAULT 0,
+      first_opened_at TIMESTAMPTZ,
+      last_opened_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_guests_wedding ON guests (wedding_id)');
+  await pool.query('ALTER TABLE guests ADD COLUMN IF NOT EXISTS lang TEXT');
+  await pool.query('ALTER TABLE rsvp_responses ADD COLUMN IF NOT EXISTS guest_id INTEGER');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_rsvp_guest ON rsvp_responses (guest_id)');
+
+  // Analitika / real-time lenta: link_start (bot), open, rsvp, section...
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS events (
+      id BIGSERIAL PRIMARY KEY,
+      wedding_id INTEGER NOT NULL,
+      guest_id INTEGER,
+      type TEXT NOT NULL,
+      tg_id BIGINT,
+      meta TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_events_wedding ON events (wedding_id, created_at)');
+
+  // AI so'rovlari limiti (foydalanuvchi/kun)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      tg_id BIGINT NOT NULL,
+      day TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (tg_id, day)
+    )`);
 }
 
 // Baza vaqtincha mavjud bo'lmasa (masalan Render'da baza "uyg'onmoqda") server yiqilmaydi va
@@ -114,15 +218,16 @@ async function saveRsvpDurable(rsvp, buildNotification) {
     await client.query('BEGIN');
     const ins = await client.query(
       `INSERT INTO rsvp_responses
-         (guest_name, status, guest_count, comment, language, wedding_id, guest_tg_id, guest_username, client_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         (guest_name, status, guest_count, comment, language, wedding_id, guest_tg_id, guest_username, client_id, guest_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [rsvp.guestName, rsvp.status, rsvp.guestCount || 1, rsvp.comment || null, rsvp.language || 'uz',
-       rsvp.weddingId || null, rsvp.guestTgId || null, rsvp.guestUsername || null, rsvp.clientId || null]
+       rsvp.weddingId || null, rsvp.guestTgId || null, rsvp.guestUsername || null, rsvp.clientId || null, rsvp.guestId || null]
     );
     const row = ins.rows[0];
-    const n = buildNotification && buildNotification(row);
-    if (n) await outbox.enqueue(client, { ...n, dedupeKey: `rsvp:${row.id}` });
+    // Bir yoki bir nechta xabar (egasi + hammuallif): har biri o'z dedupe kaliti bilan, hammasi bir tranzaksiyada
+    const list = [].concat((buildNotification && buildNotification(row)) || []);
+    for (const n of list) await outbox.enqueue(client, { ...n, dedupeKey: n.dedupeKey || `rsvp:${row.id}` });
     await client.query('COMMIT');
     return { row, duplicate: false };
   } catch (err) {
@@ -152,73 +257,11 @@ async function getAllRsvps() {
 async function getRsvpsByWedding(weddingId) {
   await ready;
   const result = await pool.query(
-    `SELECT id, guest_name, status, guest_count, comment, guest_username, created_at
+    `SELECT id, guest_name, status, guest_count, comment, guest_username, guest_id, created_at
        FROM rsvp_responses WHERE wedding_id = $1 ORDER BY created_at DESC`,
     [weddingId]
   );
   return result.rows;
 }
 
-// ---------- TO'YLAR ----------
-// Taklifnoma ko'p o'qiladi (har mehmon ochganda va har RSVP'da) — qisqa muddat xotirada saqlaymiz.
-// Yangilanganda (upsertWedding) kesh o'chiriladi, shuning uchun eskirgan ma'lumot ko'rinmaydi.
-const weddingCache = new Map(); // code -> { row, at }
-const CACHE_TTL = 60 * 1000;
-
-async function getWeddingByCode(code) {
-  const hit = weddingCache.get(code);
-  if (hit && Date.now() - hit.at < CACHE_TTL) return hit.row;
-  await ready;
-  const r = await pool.query('SELECT * FROM weddings WHERE code = $1', [code]);
-  const row = r.rows[0] || null;
-  if (row) {
-    if (weddingCache.size > 200) weddingCache.clear(); // foto ham ichida — xotira chegarasi
-    weddingCache.set(code, { row, at: Date.now() });
-  }
-  return row;
-}
-
-async function getWeddingByOwner(ownerId) {
-  await ready;
-  const r = await pool.query('SELECT * FROM weddings WHERE owner_id = $1', [ownerId]);
-  return r.rows[0] || null;
-}
-
-// Havola kodi: 8 ta belgi (url-safe). Taxmin qilib bo'lmaydigan, lekin sir emas —
-// xavfsizlik kod emas, Telegram imzosi bilan ta'minlanadi.
-function newCode() {
-  return crypto.randomBytes(6).toString('base64url');
-}
-
-// Egasi uchun to'yni yaratadi yoki yangilaydi (bitta egasi — bitta to'y). Kod o'zgarmaydi.
-async function upsertWedding(ownerId, ownerName, w) {
-  await ready;
-  const existing = await getWeddingByOwner(ownerId);
-  const values = [
-    w.design, w.groom, w.bride, w.date, w.ceremonyTime, w.banquetTime, w.startsAt,
-    w.venueName, w.venueAddress, w.mapQuery, w.message, w.photo,
-  ];
-  if (existing) {
-    const r = await pool.query(
-      `UPDATE weddings SET design=$1, groom=$2, bride=$3, wedding_date=$4, ceremony_time=$5,
-         banquet_time=$6, starts_at=$7, venue_name=$8, venue_address=$9, map_query=$10,
-         message=$11, photo=$12, owner_name=$13, updated_at=NOW()
-       WHERE owner_id=$14 RETURNING *`,
-      [...values, ownerName || null, ownerId]
-    );
-    weddingCache.delete(existing.code);
-    return r.rows[0];
-  }
-  const r = await pool.query(
-    `INSERT INTO weddings (code, owner_id, owner_name, design, groom, bride, wedding_date, ceremony_time,
-       banquet_time, starts_at, venue_name, venue_address, map_query, message, photo)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-    [newCode(), ownerId, ownerName || null, ...values]
-  );
-  return r.rows[0];
-}
-
-module.exports = {
-  pool, ready, saveRsvpDurable, getAllRsvps, getRsvpsByWedding,
-  getWeddingByCode, getWeddingByOwner, upsertWedding,
-};
+module.exports = { pool, ready, saveRsvpDurable, getAllRsvps, getRsvpsByWedding };

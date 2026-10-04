@@ -1,69 +1,88 @@
-# Toy Backend — RSVP + Telegram bot
+# Toyga — свадебные приглашения: Telegram-бот + Mini App
 
-## Fayllar nima uchun kerak?
+Один бот (`@toygabot`) обслуживает много свадеб. Владелец создаёт и оформляет приглашение прямо в Mini App, получает
+персональные ссылки для гостей, а ответы приходят ему в бот в реальном времени.
 
-- `package.json` — qaysi kutubxonalar kerakligi ro'yxati
-- `schema.sql` — bazada jadval yaratish buyrug'i
-- `.env.example` — qanday maxfiy sozlamalar kerakligi (namuna)
-- `src/db.js` — baza bilan ishlash
-- `src/bot.js` — Telegram bot
-- `src/routes/rsvp.js` — saytdan kelgan RSVP so'rovini qabul qiladi
-- `src/index.js` — hammasini ishga tushiradigan asosiy fayl
-
-## 1-qadam: Yangi Telegram bot yaratish
-
-1. Telegram'da @BotFather'ga yozing
-2. `/newbot` buyrug'ini yuboring, botga nom bering
-3. Sizga TOKEN beradi (masalan `123456789:ABCdefGHI...`) — shuni saqlab qo'ying
-
-## 2-qadam: O'zingizning chat_id'ingizni topish
-
-1. Telegram'da @userinfobot'ga yozing (yoki botingizga birinchi xabar yuboring)
-2. U sizga raqamli ID beradi (masalan `123456789`) — shuni saqlab qo'ying
-
-## 3-qadam: Kompyuterda sozlash
-
-```bash
-cd toy-backend
-npm install
-cp .env.example .env
+```
+Владелец:  /start → Mini App → создание → шаблон → редактор → предпросмотр → публикация → ссылки
+Гость:     ссылка (t.me/<bot>?start=w_|g_…) → кнопка в боте → Mini App → приглашение → RSVP → уведомление владельцу
 ```
 
-Endi `.env` faylini oching va quyidagilarni to'ldiring:
-- `TELEGRAM_BOT_TOKEN` — 1-qadamda olgan token
-- `ADMIN_CHAT_ID` — 2-qadamda olgan ID
-- `DATABASE_URL` — hozircha bo'sh qoldirsa ham bo'ladi (keyingi qadamda to'ldiramiz)
+## Что внутри (30 функций → где живут)
 
-## 4-qadam: Bazani sozlash
+| Блок | Функции | Где |
+|---|---|---|
+| **Опыт гостя** | Live Countdown, Digital Envelope (печать), Cinematic Intro, Confetti, параллакс, галерея со свайпом, видео, музыка, карта | `public/invite.js`, `invite.css` |
+| **Дизайн** | 25 шаблонов (6 макетов × палитры × шрифты × орнаменты), 16 цветовых тем + свои цвета, 10 шрифтов (кириллица ✓), Live Editor с живым превью | `public/templates.js`, `owner.js` |
+| **Контент** | Наша история/Timeline, Программа дня, Место + карта (Google/Яндекс), Дресс-код, Меню, Свои разделы, Галерея, Видео, Музыка, порядок и видимость секций | `public/owner-content.js` |
+| **Гости** | Персональные ссылки, группы, импорт, статистика, экспорт CSV (бот присылает файл), приватные приглашения | `public/owner-guests.js`, `src/routes/owner.js` |
+| **Аналитика** | Link Analytics (переходы из бота → открытия → ответы), график, группы, не открывшие | `src/store.js` |
+| **Уведомления** | Real-time (бот + лента), «гость открыл приглашение», автоматические напоминания (7д/1д/3ч, не ответившим 14д/7д) | `src/notify.js`, `src/reminders.js` |
+| **Команда** | Co-host: приглашение по ссылке, совместное редактирование с защитой от конфликтов | `src/routes/owner.js` |
+| **AI** | AI Invitation Builder (шаблон+цвета+шрифт+все тексты), AI Wedding Text (тон × язык) — реальные вызовы Claude | `src/ai.js` |
+| **Надёжность** | Transactional outbox, идемпотентность, очередь ответов на устройстве, автосохранение с локальной копией | `OUTBOX.md` |
 
-Eng oson yo'l — [Render.com](https://render.com) yoki [Neon.tech](https://neon.tech)'da bepul PostgreSQL yaratish:
-1. Ro'yxatdan o'tib, "New PostgreSQL" tugmasini bosing
-2. Sizga `DATABASE_URL` beradi — shuni `.env`'ga qo'ying
-3. `schema.sql` faylidagi buyruqni shu bazada bir marta ishga tushiring (Render/Neon konsolida "Query" bo'limi orqali, yoki `psql` bilan)
+## Архитектура
 
-## 5-qadam: Lokal sinash
-
-```bash
-npm run dev
+```
+Telegram ──► bot.js (polling) ──┐
+                                ├──► Express (src/index.js) ──► PostgreSQL (db.js: схема + миграции при старте)
+Mini App (public/, отдаётся ────┘      │   /api/invite  /api/owner  /api/cohost  /api/media  /api/rsvp  /api/admin
+ самим сервером на /app/)              ├── outbox worker  ──► Telegram (повторы, лимиты, документы)
+                                       ├── reminders (раз в минуту, дедупликация через outbox)
+                                       └── ai.js ──► Claude API (официальный SDK, JSON-схема на выходе)
 ```
 
-Brauzerda `http://localhost:3001` ochib ko'ring — `{"status":"ok",...}` chiqsa, ishlayapti.
+* **Доступ.** Любой запрос подписан Telegram (`initData`, HMAC-SHA256 токеном бота) и проверяется на сервере. `owner_id` **никогда** не берётся из тела запроса.
+  Владелец видит только свою свадьбу (членство в `wedding_members`); со-ведущий не может публиковать, менять приватность и настройки, приглашать других.
+* **Ссылки.** `w_<код>` — общая (в приватной свадьбе отклоняется), `g_<токен>` — персональная гостя (работает всегда), `c_<токен>` — приглашение со-ведущего (7 дней, одноразовая).
+  Бот отвечает кнопкой Mini App с `?w=` / `?g=` / `?c=` (inline-кнопка не передаёт `start_param`).
+* **Данные.** Контент свадьбы — JSON (валидируется `src/validate.js`: белые списки, длины, цвета, ссылки на медиа только своей свадьбы).
+  Фото/видео/музыка — в PostgreSQL (`BYTEA`): диск Render временный. Фото ужимается на устройстве (1280px + превью), формат проверяется по сигнатуре файла, квота 60 МБ.
+* **Скорость гостя.** Страница одним файлом (CSS+JS вшиваются на сервере, ~30 КБ gzip), данные свадьбы запрашиваются параллельно загрузке, карта и видео — по требованию,
+  редактор владельца (~36 КБ gzip) грузится только владельцу.
+* **Запросы к Telegram** идут только через outbox: уведомления, напоминания, файлы CSV.
 
-Sinov uchun terminalda:
-```bash
-curl -X POST http://localhost:3001/api/rsvp \
-  -H "Content-Type: application/json" \
-  -d '{"guestName":"Test Odam","status":"yes","guestCount":2}'
-```
+## Переменные окружения (Render → Environment)
 
-Telegram botingizga xabar kelishi kerak. Botga `/ro'yxat` yozib ko'ring.
+| Переменная | Обязательно | Зачем |
+|---|---|---|
+| `DATABASE_URL` | да | PostgreSQL (на Render — **Internal** URL, тот же регион) |
+| `TELEGRAM_BOT_TOKEN` | да | токен бота; **не хранить в git** (`.env` в `.gitignore`) |
+| `ANTHROPIC_API_KEY` | для AI | ключ Claude API. Без него AI-кнопки покажут «AI не подключён», остальное работает |
+| `AI_MODEL` | нет | по умолчанию `claude-opus-5-5` (можно дешевле/быстрее, напр. `claude-sonnet-5-5`) |
+| `AI_DAILY_LIMIT` | нет | запросов AI на пользователя в сутки, по умолчанию 30 |
+| `ADMIN_CHAT_ID` | нет | ваш Telegram ID: контроль очереди (`/status`, `/retry`) и старый браузерный RSVP |
+| `ALLOWED_ORIGIN` | нет | домены браузерной версии через запятую (CORS) |
+| `WEBAPP_URL` | нет | если Mini App хостится не на этом сервере |
+| `BOT_USERNAME` | нет | иначе берётся через `getMe()` |
+| `OUTBOX_*`, `REMINDERS_INTERVAL_MS` | нет | тонкая настройка доставки и напоминаний (см. `OUTBOX.md`) |
 
-## 6-qadam: Render'ga joylashtirish
+Бот при старте сам ставит меню-кнопку «Таклифнома 💌», команду `/start` и описание на 3 языках. Для большой кнопки «Open App» в профиле:
+@BotFather → Bot Settings → Configure Mini App → URL `https://<сервер>/app/`.
 
-1. Kodni GitHub'ga yuklaysiz
-2. Render.com'da "New Web Service" → GitHub repo'ni tanlaysiz
-3. Build command: `npm install`, Start command: `npm start`
-4. "Environment" bo'limida `.env`'dagi barcha qiymatlarni qo'shasiz
-5. Deploy tugmasini bosasiz — bir necha daqiqada tayyor bo'ladi, sizga URL beradi (masalan `https://toy-backend.onrender.com`)
+## API (кратко)
 
-Shu URL'ni keyinroq frontend sayt bilan ulaymiz.
+* Публично: `GET /api/invite/w/:code`, `GET /api/invite/g/:token`, `POST /api/invite/view`, `GET /api/media/:id` (Range), `POST /api/rsvp`
+* Владелец/со-ведущий (подпись обязательна): `/api/owner/{me,save,publish}`, `/guests/{list,save,delete,import,export}`, `/groups/{save,delete}`, `/analytics`, `/activity`,
+  `/cohost/{invite,remove}`, `/ai/{build,text}`, `/media/{image,video,audio,delete,list}`; `/api/cohost/{info,accept}`
+* Администратор: `/api/admin/outbox`, `/api/admin/outbox/retry`; в боте: `/status`, `/retry`
+
+## Деплой
+
+1. `git push` в `main` — Render сам пересоберёт. Таблицы создаются/обновляются при старте (идемпотентно), `schema.sql` запускать не нужно.
+2. Задайте `TELEGRAM_BOT_TOKEN`, `DATABASE_URL`, `ANTHROPIC_API_KEY`.
+3. Бот: `/start` → «Открыть». Приложение: `https://<сервер>/app/`.
+
+## Тесты
+
+См. `test/README.md`: статические проверки + **175 интеграционных проверок на настоящем PostgreSQL** (права доступа, приватность, медиа, гости, AI через подмену API,
+напоминания, отказы Telegram, гонки, откат транзакций, нагрузка).
+
+## Ограничения (честно)
+
+* Видео ≤ 12 МБ, музыка ≤ 8 МБ, фото ужимаются; всего 60 МБ на свадьбу. Для больших видео нужен объектный сторедж (S3/R2) — архитектура готова (`media` изолирована в `store.js`).
+* Бесплатный Render засыпает; сервер сам себя будит каждые 10 минут. Холодный старт после перезапуска — до ~30–50 с.
+* Интерфейс кабинета владельца: узбекский и русский; при японском языке показывается русский. Тексты для гостей — на трёх языках.
+* Подпись Telegram действует 24 часа: если кабинет открыт дольше, сохранение вернёт «сессия устарела» (правки лежат на устройстве и уйдут при следующем открытии).
+* Доставка уведомлений — at-least-once (подробности в `OUTBOX.md`).

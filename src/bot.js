@@ -1,7 +1,8 @@
 // Bu fayl Telegram bot bilan bog'liq hamma narsani boshqaradi.
 
 const TelegramBot = require('node-telegram-bot-api');
-const { getAllRsvps, getWeddingByCode } = require('./db');
+const { getAllRsvps } = require('./db');
+const store = require('./store');
 const outbox = require('./outbox');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -88,10 +89,14 @@ function getBotUsername() {
   return usernamePromise;
 }
 
-// Egasi mehmonlarga yuboradigan havola: t.me/<bot>?start=w_<kod>
-async function weddingLink(code) {
-  return `https://t.me/${await getBotUsername()}?start=w_${code}`;
+// Havolalar: t.me/<bot>?start=<prefiks>_<kod>
+//   w_<kod>   — umumiy taklifnoma havolasi
+//   g_<token> — mehmonning shaxsiy havolasi (private to'yda ham ishlaydi)
+//   c_<token> — hammuallifga taklif
+async function startLink(prefix, code) {
+  return `https://t.me/${await getBotUsername()}?start=${prefix}_${code}`;
 }
+const weddingLink = (code) => startLink('w', code); // eski nom (moslik uchun)
 
 // Bot matnlari foydalanuvchi tiliga qarab (Telegram language_code)
 const TEXT = {
@@ -101,6 +106,10 @@ const TEXT = {
     invite: (title) => `💌 ${title}\n\nТаклифномани очиш учун тугмани босинг 👇`,
     openInvite: 'Таклифномани очиш 💌',
     notFound: 'Бу ҳавола ишламайди. Тўй эгасидан янги ҳавола сўранг.',
+    private: 'Бу таклифнома махфий. Тўй эгасидан ўзингизга аталган шахсий ҳаволани сўранг.',
+    draft: 'Таклифнома ҳали эълон қилинмаган. Бироз кейинроқ уриниб кўринг.',
+    cohost: (title) => `💑 Сизни ${title} тўйининг ҳаммуаллифи бўлишга таклиф қилишди.\n\nҚабул қилиш учун тугмани босинг 👇`,
+    openCohost: 'Қабул қилиш 💑',
   },
   ru: {
     welcome: 'Здравствуйте! 💍 Это бот свадебных приглашений. Нажмите кнопку, чтобы создать или открыть приглашение 👇',
@@ -108,6 +117,10 @@ const TEXT = {
     invite: (title) => `💌 ${title}\n\nНажмите кнопку, чтобы открыть приглашение 👇`,
     openInvite: 'Открыть приглашение 💌',
     notFound: 'Эта ссылка не работает. Попросите у владельца свадьбы новую ссылку.',
+    private: 'Это приватное приглашение. Попросите у владельца свадьбы вашу персональную ссылку.',
+    draft: 'Приглашение ещё не опубликовано. Попробуйте чуть позже.',
+    cohost: (title) => `💑 Вас приглашают стать соведущим свадьбы ${title}.\n\nНажмите кнопку, чтобы принять 👇`,
+    openCohost: 'Принять 💑',
   },
   ja: {
     welcome: 'ようこそ！💍 結婚式の招待状ボットです。ボタンを押して招待状を作成・開封してください 👇',
@@ -115,6 +128,10 @@ const TEXT = {
     invite: (title) => `💌 ${title}\n\nボタンを押して招待状を開いてください 👇`,
     openInvite: '招待状を開く 💌',
     notFound: 'このリンクは無効です。新郎新婦に新しいリンクをお願いしてください。',
+    private: 'このご招待は非公開です。新郎新婦からあなた専用のリンクを受け取ってください。',
+    draft: '招待状はまだ公開されていません。しばらくしてからお試しください。',
+    cohost: (title) => `💑 ${title} の結婚式の共同ホストに招待されました。\n\nボタンを押して承諾してください 👇`,
+    openCohost: '承諾する 💑',
   },
 };
 const tr = (msg) => TEXT[(msg.from && msg.from.language_code || '').slice(0, 2)] || TEXT.uz;
@@ -122,11 +139,11 @@ const tr = (msg) => TEXT[(msg.from && msg.from.language_code || '').slice(0, 2)]
 function webAppButton(text, url) {
   return { reply_markup: { inline_keyboard: [[{ text, web_app: { url } }]] } };
 }
+const appUrl = (query) => `${webAppUrl.replace(/\/$/, '')}/?${query}`;
 
-// /start [w_<kod>]
-//  • w_<kod> bor  → mehmon: shu to'yning taklifnomasi Mini App'da ochiladigan tugma
-//  • w_<kod> yo'q → Mini App'ning o'zi (u yerda "to'y egasimisiz yoki mehmon?" tanlovi)
-// Kod URL'ga ?w=<kod> bo'lib qo'shiladi — inline web_app tugmasida start_param ishlamaydi.
+// /start [w_<kod> | g_<token> | c_<token>]
+// Kod URL'ga ?w= / ?g= / ?c= bo'lib qo'shiladi — inline web_app tugmasida start_param ishlamaydi.
+// Parametrsiz /start — Mini App'ning o'zi ("to'y egasimisiz yoki mehmon?").
 bot.onText(/^\/start(?:@\w+)?(?:\s+(\S+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const t = tr(msg);
@@ -134,18 +151,34 @@ bot.onText(/^\/start(?:@\w+)?(?:\s+(\S+))?/, async (msg, match) => {
     return bot.sendMessage(chatId, "Mini App manzili (WEBAPP_URL) sozlanmagan.");
   }
 
-  const param = match && match[1];
-  const code = param && /^w_[\w-]{4,32}$/.test(param) ? param.slice(2) : null;
-
-  if (!code) {
-    return bot.sendMessage(chatId, t.welcome, webAppButton(t.open, webAppUrl));
-  }
+  const m = match && match[1] && /^([wgc])_([\w-]{4,40})$/.exec(match[1]);
+  if (!m) return bot.sendMessage(chatId, t.welcome, webAppButton(t.open, webAppUrl));
+  const [, kind, key] = m;
+  const from = msg.from || {};
 
   try {
-    const wedding = await getWeddingByCode(code);
+    if (kind === 'c') {
+      const inv = await store.getCohostInvite(key);
+      if (!inv || inv.used_at || new Date(inv.expires_at).getTime() < Date.now()) return bot.sendMessage(chatId, t.notFound);
+      return bot.sendMessage(chatId, t.cohost(`${inv.groom} & ${inv.bride}`), webAppButton(t.openCohost, appUrl(`c=${encodeURIComponent(key)}`)));
+    }
+
+    let wedding = null, guest = null;
+    if (kind === 'g') {
+      guest = await store.getGuestByToken(key);
+      wedding = guest && (await store.getWeddingRow(guest.wedding_id));
+    } else {
+      wedding = await store.getWeddingByCodeRow(key);
+      if (wedding && wedding.visibility === 'private') return bot.sendMessage(chatId, t.private); // umumiy kod private to'yni ochmaydi
+    }
     if (!wedding) return bot.sendMessage(chatId, t.notFound);
-    const url = `${webAppUrl.replace(/\/$/, '')}/?w=${encodeURIComponent(code)}`;
-    bot.sendMessage(chatId, t.invite(`${wedding.groom} & ${wedding.bride}`), webAppButton(t.openInvite, url));
+    if (!wedding.published) return bot.sendMessage(chatId, t.draft);
+
+    // Havola analitikasi: bot orqali kim qaysi havola bilan kirdi
+    await store.logEvent({ weddingId: wedding.id, guestId: guest ? guest.id : null, type: 'link_start', tgId: from.id, meta: { name: [from.first_name, from.last_name].filter(Boolean).join(' '), username: from.username || null, link: kind } });
+
+    const query = kind === 'g' ? `g=${encodeURIComponent(key)}` : `w=${encodeURIComponent(key)}`;
+    bot.sendMessage(chatId, t.invite(`${wedding.groom} & ${wedding.bride}`), webAppButton(t.openInvite, appUrl(query)));
   } catch (err) {
     console.error('/start (deep-link) xatolik:', err.message);
     bot.sendMessage(chatId, t.welcome, webAppButton(t.open, webAppUrl));
@@ -189,10 +222,14 @@ bot.onText(/\/ro'yxat/, async (msg) => {
 function sendToChat(chatId, text, options) {
   return bot.sendMessage(chatId, text, options);
 }
+// Fayl (masalan CSV eksport) yuborish — outbox ham shu orqali yetkazadi
+function sendDocToChat(chatId, buffer, options, fileOptions) {
+  return bot.sendDocument(chatId, buffer, options, fileOptions);
+}
 
 // Polling xatolari (masalan 409 Conflict) serverni yiqitmasin, logda ko'rinsin
 bot.on('polling_error', (err) => {
   console.error('Telegram polling xatosi:', err.code, err.message);
 });
 
-module.exports = { bot, sendToChat, weddingLink };
+module.exports = { bot, sendToChat, sendDocToChat, weddingLink, startLink, appUrl: (query) => (webAppUrl ? appUrl(query) : null) };
