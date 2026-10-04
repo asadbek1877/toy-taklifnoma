@@ -95,10 +95,22 @@ async function getRsvpsByWedding(weddingId) {
 }
 
 // ---------- TO'YLAR ----------
+// Taklifnoma ko'p o'qiladi (har mehmon ochganda va har RSVP'da) — qisqa muddat xotirada saqlaymiz.
+// Yangilanganda (upsertWedding) kesh o'chiriladi, shuning uchun eskirgan ma'lumot ko'rinmaydi.
+const weddingCache = new Map(); // code -> { row, at }
+const CACHE_TTL = 60 * 1000;
+
 async function getWeddingByCode(code) {
+  const hit = weddingCache.get(code);
+  if (hit && Date.now() - hit.at < CACHE_TTL) return hit.row;
   await ready;
   const r = await pool.query('SELECT * FROM weddings WHERE code = $1', [code]);
-  return r.rows[0] || null;
+  const row = r.rows[0] || null;
+  if (row) {
+    if (weddingCache.size > 200) weddingCache.clear(); // foto ham ichida — xotira chegarasi
+    weddingCache.set(code, { row, at: Date.now() });
+  }
+  return row;
 }
 
 async function getWeddingByOwner(ownerId) {
@@ -129,6 +141,7 @@ async function upsertWedding(ownerId, ownerName, w) {
        WHERE owner_id=$14 RETURNING *`,
       [...values, ownerName || null, ownerId]
     );
+    weddingCache.delete(existing.code);
     return r.rows[0];
   }
   const r = await pool.query(

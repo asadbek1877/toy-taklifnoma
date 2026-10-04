@@ -8,9 +8,8 @@
    ============================================================ */
 
 // ---------- SOZLAMALAR ----------
-const IS_DEV = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-// Faqat localhost'da ?api=http://localhost:PORT bilan boshqa backend'ga ulanish mumkin (sinov uchun)
-const BACKEND_URL = (IS_DEV && new URLSearchParams(location.search).get("api")) || "https://toy-taklifnoma.onrender.com";
+// BACKEND_URL index.html'dagi erta skriptda aniqlanadi (u taklifnomani oldindan so'rash uchun ham kerak)
+const BACKEND_URL = window.BACKEND_URL || "https://toy-taklifnoma.onrender.com";
 
 // ---------- TELEGRAM ----------
 const tg = window.Telegram && window.Telegram.WebApp;
@@ -36,7 +35,7 @@ if (inTelegram) {
 }
 
 // Backendni oldindan uyg'otamiz (Render bepul tarifda uxlab qoladi)
-fetch(`${BACKEND_URL}/health`, { mode: "no-cors", cache: "no-store" }).catch(() => {});
+if (!window.__prefetch) fetch(`${BACKEND_URL}/health`, { mode: "no-cors", cache: "no-store" }).catch(() => {});
 
 // Backend bilan ishlash. body berilsa POST (tgInitData avtomatik qo'shiladi), aks holda GET.
 async function api(path, body) {
@@ -419,9 +418,10 @@ function applyWedding(w) {
 
   // Foto
   const ring = $("photo-ring");
-  if (w.photo) {
-    $("couple-photo").src = w.photo; ring.classList.remove("no-photo");
-    document.querySelector(".intro-photo").style.backgroundImage = `linear-gradient(rgba(251,248,242,0.78), rgba(251,248,242,0.88)), url(${w.photo})`;
+  const photoSrc = w.photo || (w.photoUrl ? BACKEND_URL + w.photoUrl : null); // egasida data-URL, mehmonda kesh'lanadigan fayl
+  if (photoSrc) {
+    $("couple-photo").src = photoSrc; ring.classList.remove("no-photo");
+    document.querySelector(".intro-photo").style.backgroundImage = `linear-gradient(rgba(251,248,242,0.78), rgba(251,248,242,0.88)), url(${photoSrc})`;
   } else {
     ring.classList.add("no-photo");
     document.querySelector(".intro-photo").style.backgroundImage = "";
@@ -559,14 +559,15 @@ function startCountdown() {
 const couplePhoto = $("couple-photo");
 couplePhoto.addEventListener("error", () => $("photo-ring").classList.add("no-photo"));
 
-// Ixtiyoriy fon video (assets/hero.mp4). Fayl bo'lmasa — jimgina olib tashlanadi.
+// Ixtiyoriy fon video: HERO_VIDEO'ga manzil yozing (masalan "assets/hero.mp4"). Bo'sh bo'lsa so'rov umuman yuborilmaydi.
+const HERO_VIDEO = "";
 const heroVideo = $("hero-video");
-if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+if (!HERO_VIDEO || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
   heroVideo.remove();
 } else {
-  heroVideo.querySelector("source").addEventListener("error", () => heroVideo.remove());
+  heroVideo.addEventListener("error", () => heroVideo.remove());
   heroVideo.addEventListener("canplay", () => safe(() => heroVideo.play()), { once: true });
-  heroVideo.load();
+  heroVideo.src = HERO_VIDEO;
 }
 
 const mapQ = () => encodeURIComponent((W && (W.mapQuery || W.venueAddress || W.venueName)) || "");
@@ -716,7 +717,12 @@ async function boot() {
 
   // MEHMON: shu to'yning taklifnomasi
   try {
-    const { wedding } = await api("/api/weddings/" + encodeURIComponent(code));
+    // Ma'lumot index.html'dagi erta skript tomonidan allaqachon so'ralgan bo'lishi mumkin — tarmoq kutilmaydi
+    const pre = window.__prefetch && window.__prefetch.code === code ? await window.__prefetch.promise.catch(() => null) : null;
+    let wedding;
+    if (pre && pre.ok && pre.data) wedding = pre.data.wedding;
+    else if (pre && !pre.ok && pre.status === 404) { const err = new Error("not found"); err.status = 404; throw err; }
+    else wedding = (await api("/api/weddings/" + encodeURIComponent(code))).wedding;
     applyWedding(wedding);
     enterInvite();
   } catch (e) {

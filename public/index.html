@@ -9,10 +9,33 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Montserrat:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Montserrat:wght@300;400;500;600&display=swap" /></noscript>
 
   <!-- Telegram Mini App SDK — head'da, sinxron: app.js ishga tushguncha tayyor bo'lsin -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Tezlik: backend manzili va taklifnoma ma'lumotini DARHOL so'raymiz (app.js yuklanishini kutmaymiz) -->
+  <script>
+    (function () {
+      var qs = new URLSearchParams(location.search);
+      var isDev = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+      // Faqat localhost'da ?api=... bilan boshqa backend'ga ulanish mumkin (sinov uchun)
+      window.BACKEND_URL = (isDev && qs.get("api")) || "https://toy-taklifnoma.onrender.com";
+      var tg = window.Telegram && window.Telegram.WebApp;
+      var sp = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
+      var q = qs.get("w");
+      var code = q && /^[\w-]{4,32}$/.test(q) ? q : sp && /^w_[\w-]{4,32}$/.test(sp) ? sp.slice(2) : null;
+      if (!code) return;
+      window.__prefetch = {
+        code: code,
+        promise: fetch(window.BACKEND_URL + "/api/weddings/" + encodeURIComponent(code)).then(function (r) {
+          return r.json().catch(function () { return null; }).then(function (data) { return { ok: r.ok, status: r.status, data: data }; });
+        }),
+      };
+      window.__prefetch.promise.catch(function () {});
+    })();
+  </script>
 
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -142,13 +165,11 @@
     <section class="screen is-active" data-screen="home">
       <div class="screen-inner stagger">
         <div class="hero glass-strong">
-          <video class="hero-video" id="hero-video" muted loop playsinline preload="none" aria-hidden="true">
-            <source src="assets/hero.mp4" type="video/mp4" />
-          </video>
+          <video class="hero-video" id="hero-video" muted loop playsinline preload="none" aria-hidden="true"></video>
           <div class="hero-content">
             <p class="eyebrow" data-i18n="letter.pretitle">Taklifnoma</p>
-            <div class="photo-ring" id="photo-ring">
-              <img src="assets/couple-photo.jpg" alt="" id="couple-photo" />
+            <div class="photo-ring no-photo" id="photo-ring">
+              <img alt="" id="couple-photo" />
               <span class="monogram" aria-hidden="true">A<i>♥</i>M</span>
             </div>
             <p class="lead" data-i18n="letter.invite">Sizni to'yimizga taklif qilamiz</p>

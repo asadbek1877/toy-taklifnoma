@@ -3,6 +3,7 @@
 
 require('dotenv').config();
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -30,7 +31,27 @@ app.use(
 
 // Telegram Mini App (public/) shu serverning o'zidan beriladi: https://<server>/app/
 // Alohida hosting (Vercel) shart emas va Mini App backend bilan bir origin'da bo'ladi.
-app.use('/app', express.static(path.join(__dirname, '..', 'public'), { maxAge: '5m' }));
+const publicDir = path.join(__dirname, '..', 'public');
+
+// Tezlik uchun: /app/ ga BITTA fayl beramiz — style.css, i18n.js, app.js HTML ichiga joylanadi.
+// Shunda ilova HTML -> (css, js) ketma-ket 2 ta so'rov o'rniga 1 ta so'rovda ochiladi.
+// Fayllar o'zgarmaydi (lokal sinashda python http.server bilan alohida fayllar ishlayveradi).
+let appHtml = null;
+function buildAppHtml() {
+  const read = (f) => fs.readFileSync(path.join(publicDir, f), 'utf8');
+  let html = read('index.html');
+  html = html.replace('<link rel="stylesheet" href="style.css" />', () => `<style>${read('style.css')}</style>`);
+  html = html.replace('<script src="i18n.js"></script>', () => `<script>${read('i18n.js')}</script>`);
+  html = html.replace('<script src="app.js"></script>', () => `<script>${read('app.js')}</script>`);
+  // dev-mock faqat lokal sinash uchun — productionda (Render) kerak emas, bitta so'rov tejaladi
+  if (process.env.RENDER) html = html.replace('<script src="dev-mock.js"></script>', '');
+  return html;
+}
+app.get(['/app', '/app/', '/app/index.html'], (req, res) => {
+  if (!appHtml) appHtml = buildAppHtml();
+  res.set('Cache-Control', 'no-cache').type('html').send(appHtml); // ETag avtomatik — o'zgarmasa 304
+});
+app.use('/app', express.static(publicDir, { maxAge: '5m' }));
 
 // Server ishlayotganini tekshirish uchun oddiy yo'l
 app.get('/', (req, res) => {

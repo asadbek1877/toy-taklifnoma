@@ -21,8 +21,10 @@ function authUser(req, res) {
   return user;
 }
 
-// Ochiq javobga faqat egasi uchun maxfiy bo'lmagan maydonlar chiqadi (owner_id yo'q)
-function toPublic(w) {
+// Ochiq javobga faqat egasi uchun maxfiy bo'lmagan maydonlar chiqadi (owner_id yo'q).
+// Foto mehmon uchun JSON ichida EMAS — alohida keshlanadigan fayl (photoUrl): taklifnoma tezroq ochiladi.
+// Egasi (inlinePhoto=true) tahrirlash uchun fotoni data-URL ko'rinishida oladi.
+function toPublic(w, inlinePhoto = false) {
   return {
     code: w.code,
     design: w.design,
@@ -36,7 +38,8 @@ function toPublic(w) {
     venueAddress: w.venue_address,
     mapQuery: w.map_query,
     message: w.message,
-    photo: w.photo,
+    photo: inlinePhoto ? w.photo : undefined,
+    photoUrl: w.photo ? `/api/weddings/${w.code}/photo?v=${new Date(w.updated_at).getTime()}` : null,
   };
 }
 
@@ -101,13 +104,22 @@ router.get('/:code', wrap(async (req, res) => {
   res.json({ wedding: toPublic(w) });
 }));
 
+// Foto: v= parametri foto o'zgarganda o'zgaradi, shuning uchun 1 yil keshlash xavfsiz
+router.get('/:code/photo', wrap(async (req, res) => {
+  const w = await getWeddingByCode(req.params.code);
+  const m = w && w.photo && /^data:image\/jpeg;base64,(.+)$/.exec(w.photo);
+  if (!m) return res.status(404).end();
+  res.set({ 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' });
+  res.send(Buffer.from(m[1], 'base64'));
+}));
+
 // Egasi: o'z to'yi (yo'q bo'lsa wedding: null)
 router.post('/me', wrap(async (req, res) => {
   const user = authUser(req, res);
   if (!user) return;
   const w = await getWeddingByOwner(user.id);
   if (!w) return res.json({ wedding: null });
-  res.json({ wedding: toPublic(w), link: await weddingLink(w.code) });
+  res.json({ wedding: toPublic(w, true), link: await weddingLink(w.code) });
 }));
 
 // Egasi: yaratish / yangilash
@@ -119,7 +131,7 @@ router.post('/', wrap(async (req, res) => {
 
   const ownerName = [user.first_name, user.last_name].filter(Boolean).join(' ');
   const w = await upsertWedding(user.id, ownerName, value);
-  res.status(200).json({ wedding: toPublic(w), link: await weddingLink(w.code) });
+  res.status(200).json({ wedding: toPublic(w, true), link: await weddingLink(w.code) });
 }));
 
 // Egasi: mehmonlar javoblari
