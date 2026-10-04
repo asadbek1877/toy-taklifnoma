@@ -10,7 +10,9 @@ const cors = require('cors');
 const rsvpRoute = require('./routes/rsvp');
 
 // Botni shu yerda import qilamiz — bu uni ishga tushiradi (polling boshlanadi)
-require('./bot');
+const { sendToChat } = require('./bot');
+const db = require('./db');
+const outbox = require('./outbox');
 
 const app = express();
 
@@ -66,10 +68,27 @@ app.use('/api/rsvp', rsvpRoute);
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/weddings', require('./routes/weddings'));
 
+// Ishonchli yetkazish: bazadagi navbatni (outbox) Telegram'ga yetkazuvchi worker.
+// Server qayta ishga tushsa ham, oldingi pending xabarlar avtomatik davom ettiriladi.
+outbox.startWorker({ pool: db.pool, ready: db.ready, sender: sendToChat });
+
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server ${PORT}-portda ishga tushdi`);
 });
+
+// Deploy (SIGTERM): yangi ish olmaymiz, ketayotgan yuborishlarni kutamiz — xabar yarim yo'lda qolmasin
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal}: to'xtatilmoqda...`);
+  server.close();
+  await outbox.stopWorker(8000);
+  process.exit(0);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Render bepul tarifida server 15 daqiqa jim tursa "uxlab qoladi" va birinchi
 // so'rov 30-50 soniya kutadi. O'z-o'zimizga har 10 daqiqada so'rov yuborib uxlatmaymiz.

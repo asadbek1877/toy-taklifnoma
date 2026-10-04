@@ -39,11 +39,18 @@ if (!window.__prefetch) fetch(`${BACKEND_URL}/health`, { mode: "no-cors", cache:
 
 // Backend bilan ishlash. body berilsa POST (tgInitData avtomatik qo'shiladi), aks holda GET.
 async function api(path, body) {
-  const res = await fetch(BACKEND_URL + path, body === undefined ? {} : {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tgInitData, ...body }),
-  });
+  // 15 soniyadan keyin uzamiz — qotib qolgan so'rov navbatni to'sib qo'ymasin (qayta uriniladi)
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  let res;
+  try {
+    res = await fetch(BACKEND_URL + path, body === undefined ? { signal: ctrl.signal } : {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tgInitData, ...body }),
+      signal: ctrl.signal,
+    });
+  } finally { clearTimeout(timer); }
   let data = null;
   try { data = await res.json(); } catch (e) { /* bo'sh javob */ }
   if (!res.ok) { const err = new Error((data && data.error) || "HTTP " + res.status); err.status = res.status; throw err; }
@@ -80,6 +87,7 @@ function applyLang(lang) {
   renderDate();
   syncButtons();
   if (successShown) showSuccess(lastStatus);
+  renderDelivery();
   if (guestsData) renderGuests(guestsData);
 }
 document.querySelectorAll(".lang-btn").forEach((b) =>
@@ -591,7 +599,6 @@ const msgEl = $("form-msg");
 const submitBtn = $("rsvp-submit");
 
 let status = "";
-let sending = false;
 let successShown = false;
 let lastStatus = "";
 
@@ -638,11 +645,80 @@ function showSuccess(st) {
   successCard.hidden = false;
   setDirty(false);
   syncButtons();
+  renderDelivery();
 }
-$("rsvp-another").addEventListener("click", () => { resetRsvp(); syncButtons(); haptic("impact", "light"); });
+$("rsvp-another").addEventListener("click", () => { currentItemId = null; resetRsvp(); syncButtons(); haptic("impact", "light"); });
 
-async function submitRsvp() {
-  if (sending) return;
+// ---------- ISHONCHLI YUBORISH ----------
+// Javob avval QURILMADA saqlanadi (localStorage), keyin yuboriladi. Internet yo'q / server uxlayapti /
+// ilova yopildi — hammasida javob yo'qolmaydi: ilova o'zi qayta yuboradi (aloqa tiklanganda, qayta ochilganda,
+// yoki taymer bilan). Har javobning noyob clientId'si bor — server takroriy yuborishni qayta yozmaydi,
+// shuning uchun "ikki marta yetkazildi" bo'lmaydi.
+const QUEUE_KEY = "rsvp_queue_v1";
+function loadQueue() {
+  try { const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); return Array.isArray(q) ? q : []; }
+  catch (e) { return []; }
+}
+let queue = loadQueue();
+function persistQueue() { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); } catch (e) { /* xotira to'la / private rejim — xotirada davom etadi */ } }
+function newClientId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 12); // eski WebView
+}
+
+let currentItemId = null; // hozir ekranda ko'rsatilayotgan javob
+let flushing = false;
+let retryTimer = null;
+
+async function flushQueue() {
+  if (flushing) return;
+  flushing = true;
+  clearTimeout(retryTimer);
+  let retry = false;
+  try {
+    for (const item of queue.filter((i) => i.state === "pending")) {
+      try {
+        await api("/api/rsvp", { ...item.payload, clientId: item.clientId });
+        queue = queue.filter((i) => i !== item); // faqat serverning TASDIG'IDAN keyin o'chiriladi
+        persistQueue();
+      } catch (err) {
+        item.tries = (item.tries || 0) + 1;
+        item.lastError = String(err && err.message).slice(0, 120);
+        // 400/404 — so'rovning o'zi noto'g'ri: takrorlash befoyda. Saqlanadi, lekin urinish to'xtaydi.
+        if (err && (err.status === 400 || err.status === 404)) item.state = "rejected"; else retry = true;
+        persistQueue();
+      }
+    }
+  } finally {
+    flushing = false;
+    renderDelivery();
+  }
+  if (retry) {
+    const worst = Math.max(...queue.filter((i) => i.state === "pending").map((i) => i.tries || 1));
+    retryTimer = setTimeout(flushQueue, Math.min(2000 * 2 ** Math.min(worst - 1, 5), 60000)); // 2s, 4s, ... 60s
+  }
+}
+window.addEventListener("online", flushQueue);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) flushQueue(); });
+
+// Ekrandagi holat: kutilmoqda / yetkazildi / rad etildi
+function renderDelivery() {
+  const el = $("rsvp-delivery");
+  if (!el || !currentItemId) { if (el) el.textContent = ""; return; }
+  const item = queue.find((i) => i.clientId === currentItemId);
+  if (!item) { el.textContent = t("rsvp.delivery.sent"); el.className = "delivery is-ok"; }
+  else if (item.state === "rejected") { el.textContent = t("rsvp.delivery.rejected"); el.className = "delivery is-warn"; }
+  else { el.textContent = t("rsvp.delivery.pending"); el.className = "delivery is-wait"; }
+}
+
+// Ilova qayta ochilganda: shu to'y uchun hali yuborilmagan javob bo'lsa — uni ko'rsatamiz
+function restorePending() {
+  if (!W) return;
+  const item = queue.find((i) => i.payload.weddingCode === W.code && i.state === "pending");
+  if (item) { currentItemId = item.clientId; showSuccess(item.payload.status); }
+}
+
+function submitRsvp() {
   clearMsg();
   if (preview) { showMsg(t("preview.noSend")); return; }
 
@@ -650,31 +726,29 @@ async function submitRsvp() {
   if (!guestName) { showMsg(t("rsvp.errorName")); haptic("notify", "error"); nameInput.focus(); return; }
   if (status !== "yes" && status !== "no") { showMsg(t("rsvp.errorStatus")); haptic("notify", "error"); return; }
 
-  sending = true;
-  submitBtn.disabled = true;
-  setBusy("rsvp.sending");
-
-  try {
-    await api("/api/rsvp", {
+  // 1) Avval qurilmaga saqlaymiz — shundan keyin javob yo'qolmaydi
+  const item = {
+    clientId: newClientId(),
+    createdAt: Date.now(),
+    state: "pending",
+    tries: 0,
+    payload: {
       guestName,
       status,
       guestCount: status === "no" ? 1 : parseInt(countInput.value, 10) || 1,
       comment: commentInput.value.trim() || null,
       language: currentLang,
       weddingCode: W.code,
-    });
-    haptic("notify", "success");
-    sending = false;
-    showSuccess(status);
-  } catch (err) {
-    console.error("RSVP xatolik:", err);
-    haptic("notify", "error");
-    showMsg(t("rsvp.errorNetwork"));
-    sending = false;
-  } finally {
-    submitBtn.disabled = false;
-    setBusy(null);
-  }
+    },
+  };
+  queue.push(item);
+  persistQueue();
+  currentItemId = item.clientId;
+  haptic("notify", "success");
+
+  // 2) Mehmonni kutdirmaymiz: "qabul qilindi" darhol, yuborish fonda (kerak bo'lsa qayta uriniladi)
+  showSuccess(status);
+  flushQueue();
 }
 form.addEventListener("submit", (e) => { e.preventDefault(); submitRsvp(); });
 
@@ -724,6 +798,7 @@ async function boot() {
     else if (pre && !pre.ok && pre.status === 404) { const err = new Error("not found"); err.status = 404; throw err; }
     else wedding = (await api("/api/weddings/" + encodeURIComponent(code))).wedding;
     applyWedding(wedding);
+    restorePending();
     enterInvite();
   } catch (e) {
     if (e.status === 404) showMessage("guest.notFound.title", "guest.notFound.text");
@@ -731,3 +806,4 @@ async function boot() {
   }
 }
 boot();
+flushQueue(); // oldingi sessiyadan yuborilmay qolgan javoblar bo'lsa — darhol yuboramiz

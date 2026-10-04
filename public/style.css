@@ -232,6 +232,10 @@ body.in-telegram #rsvp-submit { display: none; }
 .success { text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; animation: rise 0.7s var(--ease) both; }
 .success-ico { font-size: 54px; animation: heart 1.6s ease-in-out infinite; }
 @keyframes heart { 50% { transform: scale(1.14); } }
+.delivery { font-size: 13px; line-height: 1.45; color: var(--ink-soft); max-width: 280px; }
+.delivery.is-ok { color: #4d7a4d; font-weight: 500; }
+.delivery.is-wait { color: var(--gold-deep); }
+.delivery.is-warn { color: #a44; }
 .success-text { font-family: var(--serif); font-size: 26px; line-height: 1.25; }
 
 /* ============ MEHMONLAR (admin) ============ */

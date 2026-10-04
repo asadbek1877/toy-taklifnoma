@@ -405,4 +405,20 @@ Object.assign(I18N.ja, {
   "editor.photoError": "写真を読み込めませんでした",
 });
 
+Object.assign(I18N.uz, {
+  "rsvp.delivery.pending": "⏳ Qurilmangizda saqlandi — aloqa bo'lishi bilan o'zi yuboriladi",
+  "rsvp.delivery.sent": "✓ To'y egasiga yetkazildi",
+  "rsvp.delivery.rejected": "⚠ Yuborib bo'lmadi. Qayta urinib ko'ring",
+});
+Object.assign(I18N.ru, {
+  "rsvp.delivery.pending": "⏳ Сохранено на устройстве — отправится само, как только появится связь",
+  "rsvp.delivery.sent": "✓ Доставлено владельцу",
+  "rsvp.delivery.rejected": "⚠ Не удалось отправить. Попробуйте ещё раз",
+});
+Object.assign(I18N.ja, {
+  "rsvp.delivery.pending": "⏳ 端末に保存しました。通信が回復次第、自動で送信されます",
+  "rsvp.delivery.sent": "✓ 新郎新婦に届きました",
+  "rsvp.delivery.rejected": "⚠ 送信できませんでした。もう一度お試しください",
+});
+
 window.I18N = I18N;

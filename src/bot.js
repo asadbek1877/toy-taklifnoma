@@ -2,6 +2,7 @@
 
 const TelegramBot = require('node-telegram-bot-api');
 const { getAllRsvps, getWeddingByCode } = require('./db');
+const outbox = require('./outbox');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const adminChatId = process.env.ADMIN_CHAT_ID;
@@ -46,6 +47,33 @@ if (webAppUrl) {
       .catch((err) => console.error('Tavsifni sozlashda xatolik:', err.message));
   });
 }
+
+// ---- Nazorat (faqat admin): /status — yetkazish navbati holati, /retry — 'failed'larni qayta navbatga ----
+const isAdmin = (msg) => String(msg.chat.id) === String(adminChatId);
+
+bot.onText(/^\/status(?:@\w+)?$/, async (msg) => {
+  if (!isAdmin(msg)) return;
+  try {
+    const st = await outbox.stats();
+    let text = `📊 Yetkazish navbati\n\n⏳ Kutilmoqda: ${st.pending}\n📤 Yuborilmoqda: ${st.sending}\n✅ Yetkazilgan: ${st.sent}\n❌ Xato (qo'lda): ${st.failed}`;
+    if (st.oldestUndeliveredSeconds > 0) text += `\n\n🕐 Eng eski yetkazilmagan: ${st.oldestUndeliveredSeconds} s`;
+    st.recentFailed.forEach((f) => { text += `\n#${f.id} → ${f.chat_id}: ${String(f.last_error).slice(0, 80)}`; });
+    if (st.failed) text += `\n\n/retry — xatolarni qayta yuborish`;
+    await bot.sendMessage(msg.chat.id, text);
+  } catch (err) {
+    bot.sendMessage(msg.chat.id, `Holatni olib bo'lmadi: ${err.message}`).catch(() => {});
+  }
+});
+
+bot.onText(/^\/retry(?:@\w+)?$/, async (msg) => {
+  if (!isAdmin(msg)) return;
+  try {
+    const n = await outbox.requeueFailed();
+    await bot.sendMessage(msg.chat.id, `🔁 Qayta navbatga qo'yildi: ${n} ta`);
+  } catch (err) {
+    bot.sendMessage(msg.chat.id, `Xatolik: ${err.message}`).catch(() => {});
+  }
+});
 
 // Botning username'i (shaxsiy havola uchun): BOT_USERNAME env yoki Telegram getMe()
 let usernamePromise = null;
@@ -157,54 +185,9 @@ bot.onText(/\/ro'yxat/, async (msg) => {
   }
 });
 
-// HTML parse_mode uchun maxsus belgilarni xavfsiz qilish (mehmon nima yozsa ham xabar buzilmasin)
-function esc(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-// Xabarning eng tepasidagi "kimdan" qatori.
-// Telegram orqali ochilgan bo'lsa — @username (yoki ism) va bosiladigan havola.
-function senderLine(tgUser) {
-  if (!tgUser) return '🌐 Sayt orqali (Telegramsiz)';
-  const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
-  const link = `<a href="tg://user?id=${tgUser.id}">${esc(fullName || 'Telegram foydalanuvchi')}</a>`;
-  return tgUser.username ? `📨 @${esc(tgUser.username)} · ${link}` : `📨 ${link}`;
-}
-
-// Yangi RSVP kelganda shu to'y egasiga (chatId) xabar yuboradi. src/routes/rsvp.js chaqiradi.
-// tgUser — tekshirilgan Telegram foydalanuvchisi yoki null; title — "Aziz & Malika" (ixtiyoriy).
-function notifyOwner(chatId, { guestName, status, guestCount, comment }, tgUser = null, title = null) {
-  const extra = Math.max(0, (Number(guestCount) || 1) - 1);
-
-  let text = `${senderLine(tgUser)}\n`;
-  if (title) text += `💒 ${esc(title)}\n`;
-  text += `\n`;
-
-  if (status === 'yes') {
-    text += `🎊 <b>МЕҲМОНДАН ХУШХАБАР!</b>\n\n`;
-    text += `👤 ${esc(guestName)}\n`;
-    text += `💚 Келаман деди\n`;
-    if (extra > 0) text += `👥 +${extra} меҳмон\n`;
-  } else {
-    text += `💌 <b>МЕҲМОНДАН ЖАВОБ</b>\n\n`;
-    text += `👤 ${esc(guestName)}\n`;
-    text += `💔 Келолмайман деди\n`;
-  }
-
-  if (comment) text += `\n💬 «${esc(comment)}»\n`;
-
-  text += status === 'yes' ? `\n🥂 Кўришгунча!` : `\n🤍 Барибир раҳмат!`;
-
-  // Promise'ni kutmaymiz (javob tez qaytsin), lekin xatoni ushlaymiz —
-  // aks holda unhandled rejection butun serverni yiqitishi mumkin.
-  bot.sendMessage(chatId, text, { parse_mode: 'HTML' }).catch((err) => {
-    console.error('Botga xabar yuborishda xatolik:', err.message);
-  });
-}
-
-// Eski (browser) oqim: to'y egasi ko'rsatilmagan — ADMIN_CHAT_ID'ga yuboriladi
-function notifyAdmin(rsvp, tgUser = null) {
-  notifyOwner(adminChatId, rsvp, tgUser);
+// Outbox worker shu orqali yuboradi (src/index.js ulaydi). Xatoni yutmaydi — worker o'zi tasniflaydi va qayta uriniladi.
+function sendToChat(chatId, text, options) {
+  return bot.sendMessage(chatId, text, options);
 }
 
 // Polling xatolari (masalan 409 Conflict) serverni yiqitmasin, logda ko'rinsin
@@ -212,4 +195,4 @@ bot.on('polling_error', (err) => {
   console.error('Telegram polling xatosi:', err.code, err.message);
 });
 
-module.exports = { bot, notifyAdmin, notifyOwner, weddingLink };
+module.exports = { bot, sendToChat, weddingLink };
