@@ -5,12 +5,12 @@
      havolasiz              -> "to'y egasimisiz yoki mehmon?"                                   */
 (function () {
   const { t, $, h, api, haptic, safe } = Core;
-  const VIEWS = ['loading', 'message', 'role', 'cohost', 'invite', 'owner'];
+  const VIEWS = ['loading', 'message', 'welcome', 'role', 'cohost', 'invite', 'owner'];
   let invite = null; // joriy taklifnoma (til o'zgarsa qayta chizish uchun)
 
   function show(name) {
     VIEWS.forEach((v) => $('v-' + v).classList.toggle('is-active', v === name));
-    document.body.classList.toggle('hide-lang', name === 'owner');
+    document.body.classList.toggle('hide-lang', name === 'owner' || name === 'welcome');
     if (name !== 'invite') delete document.body.dataset.invdark;
   }
 
@@ -63,6 +63,27 @@
     // Analitika: ochilish (faqat imzolangan foydalanuvchi hisobga olinadi)
     if (Core.inTelegram) api('/api/invite/view', kind === 'g' ? { token: key } : { code: key }).catch(() => {});
   }
+
+  // ---------- SALOMLASHUV (video) ----------
+  function showWelcome() {
+    const wv = $('welcome-video'), w = $('v-welcome');
+    w.classList.remove('out');
+    show('welcome');
+    Core.setChrome('#f3d9cf');
+    Core.back.clear();
+    const p = wv.play(); if (p && p.catch) p.catch(() => {});
+  }
+  // X bosilsa: rol ekrani ostida tayyorlanadi, video asta-sekin so'nadi
+  let leaving = false;
+  $('welcome-x').addEventListener('click', () => {
+    if (leaving) return; leaving = true; haptic('impact', 'light');
+    const w = $('v-welcome');
+    $('v-role').classList.add('is-active');
+    document.body.classList.remove('hide-lang');
+    Core.setChrome('#fbf8f2');
+    w.classList.add('out');
+    setTimeout(() => { showRole(); $('welcome-video').pause(); w.classList.remove('out'); leaving = false; }, 850);
+  });
 
   // ---------- ROL TANLASH ----------
   function showRole() {
@@ -123,7 +144,7 @@
     const e = window.__entry || {};
     if (e.kind === 'w' || e.kind === 'g') return openInvite(e.kind, e.key);
     if (e.kind === 'c') return openCohost(e.key);
-    showRole();
+    showWelcome();
   }
   boot();
   Core.rsvpQueue.flush(); // oldingi sessiyada yuborilmay qolgan javoblar bo'lsa — darhol yuboramiz

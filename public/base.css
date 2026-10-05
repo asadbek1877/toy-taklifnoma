@@ -56,6 +56,13 @@ img { max-width: 100%; display: block; }
 body[data-invdark='1'] .lang-switch { background: rgba(20, 20, 30, 0.45); border-color: rgba(255, 255, 255, 0.15); }
 body[data-invdark='1'] .lang-switch button { color: rgba(255, 255, 255, 0.7); }
 body.hide-lang .lang-switch { display: none; }
+/* salomlashuv videosi */
+#v-welcome { z-index: 20; background: #f3d9cf; opacity: 1; transition: opacity 0.8s ease; }
+#v-welcome.out { opacity: 0; pointer-events: none; }
+#v-welcome.is-active { animation: none; }
+#welcome-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #f3d9cf; }
+.welcome-x { position: absolute; z-index: 2; top: calc(var(--sa-top) + 14px); right: calc(var(--sa-right) + 14px); width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(176, 132, 62, 0.55); background: rgba(255, 246, 232, 0.55); color: #a8742a; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 4px 14px rgba(120, 80, 30, 0.18); cursor: pointer; transition: transform 0.2s, background 0.2s; }
+.welcome-x:active { transform: scale(0.92); background: rgba(255, 246, 232, 0.8); }
 
 /* xabar ko'rinishi / rol tanlash */
 .msg-card { max-width: 420px; width: 100%; text-align: center; padding: 30px 22px; }
