@@ -34,7 +34,7 @@ async function guestOpened(weddingRow, guest, tgUser) {
   const who = tgUser && tgUser.username ? ` (@${esc(tgUser.username)})` : '';
   return toMembers(weddingRow, {
     type: 'opened', dedupeBase: `open:${guest.id}`,
-    text: `👀 <b>${esc(guest.name)}</b>${who} таклифномани очди\n💒 ${title(weddingRow)}`,
+    text: `👀 <b>${esc(guest.name)}</b>${who} таклифномани очди`,
   });
 }
 

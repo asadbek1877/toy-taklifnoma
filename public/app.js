@@ -124,10 +124,6 @@
     if (e.kind === 'w' || e.kind === 'g') return openInvite(e.kind, e.key);
     if (e.kind === 'c') return openCohost(e.key);
     showRole();
-    // Egasi avval to'y yaratgan bo'lsa — kartada ko'rsatamiz (sokin tekshiruv)
-    if (Core.inTelegram) api('/api/owner/me', {}).then((me) => {
-      if (me && me.wedding) { const d = $('role-owner-d'); d.removeAttribute('data-i18n'); d.textContent = `${me.wedding.groom} & ${me.wedding.bride}`; }
-    }).catch(() => {});
   }
   boot();
   Core.rsvpQueue.flush(); // oldingi sessiyada yuborilmay qolgan javoblar bo'lsa — darhol yuboramiz

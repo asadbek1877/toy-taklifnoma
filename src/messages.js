@@ -21,7 +21,6 @@ function renderRsvpMessage({ guestName, status, guestCount, comment }, tgUser, t
   const extra = Math.max(0, (Number(guestCount) || 1) - 1);
 
   let text = `${senderLine(tgUser)}\n`;
-  if (title) text += `💒 ${esc(title)}\n`;
   text += `\n`;
 
   if (status === 'yes') {
