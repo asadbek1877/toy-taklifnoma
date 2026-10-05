@@ -557,15 +557,20 @@
   };
 
   ns.askResume = () => {
-    const d = S.draft, root = S.root;
+    const root = S.root;
     clear(root); root.className = 'view owner-root is-active';
-    root.append(h('div', { class: 'o-main wiz' }, h('div', { class: 'o-wiz' },
-      h('div', { class: 'o-wiz-hero' }, h('div', null, '💍'), h('h1', null, t('o.resumeTitle')), h('p', null, t('o.resumeSub', { names: `${d.groom} & ${d.bride}` }))),
-      ui.btn('▶️ ' + t('o.resumeKeep'), () => { mainShell(); go('home'); }, 'primary'),
-      ui.btn('🆕 ' + t('o.resumeNew'), async () => {
+    const svg = (html, cls) => { const e = h('span', { class: cls }); e.innerHTML = html; return e; };
+    const card = (icon, title, desc, fn) => h('button', { type: 'button', class: 'role-card glass', onclick: fn }, svg(icon, 'ico'), h('span', { class: 'txt' }, h('b', null, title), h('span', { class: 'd' }, desc)), svg("<svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 5l7 7-7 7\"/></svg>", 'chev'));
+    root.append(h('div', { class: 'resume-screen' }, h('div', { class: 'role-wrap' },
+      h('div', { class: 'role-brand' }, svg("<svg viewBox=\"0 0 64 56\" width=\"46\" height=\"40\" fill=\"none\" stroke=\"#b9833a\" stroke-width=\"2.4\"><circle cx=\"24\" cy=\"36\" r=\"14\"/><circle cx=\"40\" cy=\"36\" r=\"14\"/><path d=\"M32 12c-2.2-3.4-7.6-2-7.6 2 0 3 4.6 5.6 7.6 8 3-2.4 7.6-5 7.6-8 0-4-5.4-5.4-7.6-2z\" fill=\"#e9a3a8\" stroke=\"#c76a74\" stroke-width=\"1.6\"/></svg>"), h('span', null, t('brand'))),
+      h('h1', { class: 'role-title' }, t('o.resumeTitle')),
+      h('div', { class: 'role-sep' }, h('i'), svg("<svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"#e08a95\"><path d=\"M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5.5 6 5.5c2 0 3.3 1.2 4 2.4.7-1.2 2-2.4 4-2.4 3 0 4.8 3.1 3.5 6.3C19.5 16.4 12 21 12 21z\"/></svg>"), h('i')),
+      card("<svg viewBox=\"0 0 48 48\" width=\"34\" height=\"34\" aria-hidden=\"true\"><defs><linearGradient id=\"rg1\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#f6dc9a\"/><stop offset=\".5\" stop-color=\"#c9953f\"/><stop offset=\"1\" stop-color=\"#8f6420\"/></linearGradient><linearGradient id=\"rg2\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#ffffff\"/><stop offset=\".55\" stop-color=\"#bfe3ff\"/><stop offset=\"1\" stop-color=\"#7fb4e6\"/></linearGradient></defs><circle cx=\"24\" cy=\"29\" r=\"12.5\" fill=\"none\" stroke=\"url(#rg1)\" stroke-width=\"4.4\"/><path d=\"M18.5 9.5h11l4 5-9.5 10.5L14.5 14.5z\" fill=\"url(#rg2)\" stroke=\"#6f9fd0\" stroke-width=\"1\" stroke-linejoin=\"round\"/><path d=\"M14.5 14.5h19M20.5 9.5l3.5 5 3.5-5M24 25l-3.5-10.5M24 25l3.5-10.5\" fill=\"none\" stroke=\"#fff\" stroke-opacity=\".85\" stroke-width=\".9\" stroke-linejoin=\"round\"/></svg>", t('o.resumeKeep'), t('o.resumeKeepD'), () => { haptic('impact', 'light'); mainShell(); go('home'); }),
+      card("<svg viewBox=\"0 0 48 48\" width=\"34\" height=\"34\" aria-hidden=\"true\"><defs><linearGradient id=\"sg1\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#f6dc9a\"/><stop offset=\".55\" stop-color=\"#d9a64b\"/><stop offset=\"1\" stop-color=\"#a8742a\"/></linearGradient></defs><path d=\"M22 6l3.600 11.400L37 21l-11.400 3.600L22 36l-3.600-11.400L7 21l11.400-3.600z\" fill=\"url(#sg1)\" stroke=\"#b88a3e\" stroke-width=\"1\" stroke-linejoin=\"round\"/><path d=\"M36 28l1.600 4.400L42 34l-4.400 1.600L36 40l-1.600-4.400L30 34l4.400-1.600z\" fill=\"#f2d28a\" stroke=\"#c9953f\" stroke-width=\".8\" stroke-linejoin=\"round\"/></svg>", t('o.resumeNew'), t('o.resumeNewD'), async () => {
+        haptic('impact', 'light');
         if (!(await ui.confirm(t('o.resumeNewConfirm'), t('o.resumeNew'), true))) return;
         clear(root); root.append(h('div', { class: 'o-main wiz' }, wizard(true)));
-      }, 'ghost'),
-      ui.btn(t('o.exit'), () => S.onExit && S.onExit(), 'ghost'))));
+      }),
+      h('button', { type: 'button', class: 'resume-exit', onclick: () => S.onExit && S.onExit() }, t('o.exit')))));
   };
 })();
