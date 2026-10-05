@@ -16,6 +16,7 @@
     document.body.classList.toggle('bg-blur', name !== 'welcome');
     const bv = $('welcome-video');
     if (bgOn) { const p = bv.play(); if (p && p.catch) p.catch(() => {}); } else bv.pause();
+    musicSync(bgOn);
     if (name !== 'invite') delete document.body.dataset.invdark;
   }
 
@@ -68,6 +69,26 @@
     // Analitika: ochilish (faqat imzolangan foydalanuvchi hisobga olinadi)
     if (Core.inTelegram) api('/api/invite/view', kind === 'g' ? { token: key } : { code: key }).catch(() => {});
   }
+
+  // ---------- MUSIQA (Mendelssohn — to'y marshi) ----------
+  const music = $('bg-music'), musicBtn = $('music-btn');
+  music.volume = 0.4; // baland bo'lmasin
+  let musicWanted = true, musicOn = false;
+  try { musicWanted = localStorage.getItem('toy_music') !== 'off'; } catch (e) { /* ixtiyoriy */ }
+  const paintMusic = () => musicBtn.setAttribute('aria-pressed', String(musicWanted));
+  function musicSync(bgOn) {
+    musicOn = bgOn; paintMusic();
+    if (bgOn && musicWanted) { const p = music.play(); if (p && p.catch) p.catch(() => {}); } else music.pause();
+  }
+  musicBtn.addEventListener('click', () => {
+    musicWanted = !musicWanted; haptic('impact', 'light'); paintMusic();
+    try { localStorage.setItem('toy_music', musicWanted ? 'on' : 'off'); } catch (e) { /* ixtiyoriy */ }
+    musicSync(musicOn);
+  });
+  // Brauzer ovozli avto-playni to'sib qo'ysa — birinchi tegishdayoq boshlaymiz
+  const kick = () => { if (musicOn && musicWanted && music.paused) { const p = music.play(); if (p && p.catch) p.catch(() => {}); } };
+  ['pointerdown', 'touchstart', 'keydown'].forEach((ev) => document.addEventListener(ev, kick, { once: false, passive: true }));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) music.pause(); else kick(); });
 
   // ---------- SALOMLASHUV (video) ----------
   function showWelcome() {

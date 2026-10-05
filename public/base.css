@@ -57,6 +57,11 @@ body.has-bg .lang-switch { background: rgba(255, 255, 255, 0.3); -webkit-backdro
 body[data-invdark='1'] .lang-switch { background: rgba(20, 20, 30, 0.45); border-color: rgba(255, 255, 255, 0.15); }
 body[data-invdark='1'] .lang-switch button { color: rgba(255, 255, 255, 0.7); }
 body.hide-lang .lang-switch { display: none; }
+/* musiqa tugmasi: faqat video fonli ekranlarda */
+.music-btn { position: fixed; z-index: 61; display: none; top: calc(var(--sa-top) + 14px); left: calc(var(--sa-left, 0px) + 14px); width: 38px; height: 38px; place-items: center; border-radius: 50%; border: 1px solid rgba(176, 132, 62, 0.55); background: rgba(255, 246, 232, 0.6); color: #a8742a; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 4px 14px rgba(120, 80, 30, 0.18); cursor: pointer; transition: transform 0.2s; }
+body.has-bg .music-btn { display: grid; }
+.music-btn:active { transform: scale(0.92); }
+.music-btn .off { display: none; } .music-btn[aria-pressed='false'] .on { display: none; } .music-btn[aria-pressed='false'] .off { display: grid; }
 /* umumiy video fon */
 #bg { position: fixed; inset: 0; z-index: 1; display: none; background: #f3d9cf; overflow: hidden; }
 body.has-bg #bg { display: block; }
