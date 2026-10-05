@@ -1,7 +1,7 @@
 /* i18n.js — mehmon va umumiy ekranlar matnlari (uz / ru / ja). Egasi interfeysi matnlari — i18n-owner.js (faqat egasiga yuklanadi). */
 window.I18N = {
   uz: {
-    'app.title': 'Taklifnoma',
+    'app.title': 'Taklifnoma', 'brand': 'To`yga keling',
     'role.title': "To'y egasimisiz yoki mehmon?", 'role.owner': "Men to'y egasiman", 'role.ownerDesc': 'Taklifnoma yarating va mehmonlarga yuboring',
     'role.guest': 'Men mehmonman', 'role.guestDesc': 'Taklifnoma havolasi orqali oching',
     'role.hint.title': 'Havola kerak', 'role.hint.text': "Taklifnomani ko'rish uchun to'y egasi yuborgan shaxsiy havolani oching.",
@@ -24,7 +24,7 @@ window.I18N = {
     'delivery.pending': "⏳ Qurilmangizda saqlandi — aloqa bo'lishi bilan o'zi yuboriladi", 'delivery.sent': "✓ To'y egasiga yetkazildi", 'delivery.rejected': "⚠ Yuborib bo'lmadi. Qayta urinib ko'ring",
   },
   ru: {
-    'app.title': 'Приглашение',
+    'app.title': 'Приглашение', 'brand': 'Приходите на той',
     'role.title': 'Вы владелец свадьбы или гость?', 'role.owner': 'Я владелец свадьбы', 'role.ownerDesc': 'Создайте приглашение и отправьте гостям',
     'role.guest': 'Я гость', 'role.guestDesc': 'Откройте по ссылке-приглашению',
     'role.hint.title': 'Нужна ссылка', 'role.hint.text': 'Чтобы увидеть приглашение, откройте персональную ссылку, которую прислал владелец свадьбы.',
@@ -47,7 +47,7 @@ window.I18N = {
     'delivery.pending': '⏳ Сохранено на устройстве — отправится само, как только появится связь', 'delivery.sent': '✓ Доставлено владельцу', 'delivery.rejected': '⚠ Не удалось отправить. Попробуйте ещё раз',
   },
   ja: {
-    'app.title': '招待状',
+    'app.title': '招待状', 'brand': '結婚式へようこそ',
     'role.title': '新郎新婦ですか？ゲストですか？', 'role.owner': '新郎新婦です', 'role.ownerDesc': '招待状を作成してゲストに送る',
     'role.guest': 'ゲストです', 'role.guestDesc': '招待リンクから開く',
     'role.hint.title': 'リンクが必要です', 'role.hint.text': '招待状を見るには、新郎新婦から届いた専用リンクを開いてください。',

@@ -11,6 +11,11 @@
   function show(name) {
     VIEWS.forEach((v) => $('v-' + v).classList.toggle('is-active', v === name));
     document.body.classList.toggle('hide-lang', name === 'owner' || name === 'welcome');
+    const bgOn = name === 'welcome' || name === 'role' || name === 'message' || name === 'cohost';
+    document.body.classList.toggle('has-bg', bgOn);
+    document.body.classList.toggle('bg-blur', name !== 'welcome');
+    const bv = $('welcome-video');
+    if (bgOn) { const p = bv.play(); if (p && p.catch) p.catch(() => {}); } else bv.pause();
     if (name !== 'invite') delete document.body.dataset.invdark;
   }
 
@@ -66,23 +71,18 @@
 
   // ---------- SALOMLASHUV (video) ----------
   function showWelcome() {
-    const wv = $('welcome-video'), w = $('v-welcome');
-    w.classList.remove('out');
+    $('v-welcome').classList.remove('out');
     show('welcome');
     Core.setChrome('#f3d9cf');
     Core.back.clear();
-    const p = wv.play(); if (p && p.catch) p.catch(() => {});
   }
-  // X bosilsa: rol ekrani ostida tayyorlanadi, video asta-sekin so'nadi
+  // X bosilsa: tugma so'nadi, fon asta-sekin xiralashadi, rol ekrani silliq chiqadi
   let leaving = false;
   $('welcome-x').addEventListener('click', () => {
     if (leaving) return; leaving = true; haptic('impact', 'light');
-    const w = $('v-welcome');
-    $('v-role').classList.add('is-active');
-    document.body.classList.remove('hide-lang');
-    Core.setChrome('#fbf8f2');
-    w.classList.add('out');
-    setTimeout(() => { showRole(); $('welcome-video').pause(); w.classList.remove('out'); leaving = false; }, 850);
+    $('v-welcome').classList.add('out');
+    document.body.classList.add('bg-blur');
+    setTimeout(() => { showRole(); leaving = false; }, 380);
   });
 
   // ---------- ROL TANLASH ----------

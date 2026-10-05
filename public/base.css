@@ -50,17 +50,24 @@ img { max-width: 100%; display: block; }
 .btn.small { padding: 11px 14px; font-size: 13px; border-radius: 12px; width: auto; }
 
 /* til almashtirgich */
+body.has-bg .lang-switch { background: rgba(255, 255, 255, 0.3); -webkit-backdrop-filter: blur(18px) saturate(1.8); backdrop-filter: blur(18px) saturate(1.8); border-color: rgba(255, 255, 255, 0.65); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 6px 20px rgba(150, 70, 90, 0.15); }
 .lang-switch { position: fixed; z-index: 60; top: calc(var(--sa-top) + 10px); right: calc(var(--sa-right) + 12px); display: flex; gap: 2px; padding: 3px; border-radius: 999px; }
 .lang-switch button { border: 0; background: transparent; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; padding: 6px 10px; border-radius: 999px; color: var(--soft); transition: all 0.25s var(--ease); }
 .lang-switch button.on { background: var(--grad); color: #fff; }
 body[data-invdark='1'] .lang-switch { background: rgba(20, 20, 30, 0.45); border-color: rgba(255, 255, 255, 0.15); }
 body[data-invdark='1'] .lang-switch button { color: rgba(255, 255, 255, 0.7); }
 body.hide-lang .lang-switch { display: none; }
-/* salomlashuv videosi */
-#v-welcome { z-index: 20; background: #f3d9cf; opacity: 1; transition: opacity 0.8s ease; }
-#v-welcome.out { opacity: 0; pointer-events: none; }
+/* umumiy video fon */
+#bg { position: fixed; inset: 0; z-index: 1; display: none; background: #f3d9cf; overflow: hidden; }
+body.has-bg #bg { display: block; }
+#bg video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1); filter: blur(0); transition: filter 0.9s ease, transform 0.9s ease; will-change: filter; }
+#bg i { position: absolute; inset: 0; background: rgba(255, 244, 240, 0); transition: background 0.9s ease; }
+body.bg-blur #bg video { filter: blur(5px); transform: scale(1.04); }
+body.bg-blur #bg i { background: rgba(255, 244, 240, 0.14); }
+#v-welcome { z-index: 20; background: transparent; }
 #v-welcome.is-active { animation: none; }
-#welcome-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #f3d9cf; }
+#v-welcome.out .welcome-x { opacity: 0; transition: opacity 0.35s; }
+#v-role, #v-message, #v-cohost { background: transparent; }
 .welcome-x { position: absolute; z-index: 2; top: calc(var(--sa-top) + 14px); right: calc(var(--sa-right) + 14px); width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(176, 132, 62, 0.55); background: rgba(255, 246, 232, 0.55); color: #a8742a; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 4px 14px rgba(120, 80, 30, 0.18); cursor: pointer; transition: transform 0.2s, background 0.2s; }
 .welcome-x:active { transform: scale(0.92); background: rgba(255, 246, 232, 0.8); }
 
@@ -69,12 +76,21 @@ body.hide-lang .lang-switch { display: none; }
 .msg-card .big { font-size: 52px; margin-bottom: 8px; }
 .msg-card h2 { font-size: 22px; margin-bottom: 8px; }
 .role-wrap { max-width: 440px; width: 100%; display: flex; flex-direction: column; gap: 14px; }
-.role-title { font-size: 28px; line-height: 1.15; text-align: center; margin-bottom: 6px; font-weight: 700; }
-.role-card { width: 100%; text-align: left; border-radius: 22px; padding: 18px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; border: 0; transition: transform 0.2s var(--ease); }
-.role-card:active { transform: scale(0.98); }
-.role-card .ico { width: 54px; height: 54px; border-radius: 17px; display: grid; place-items: center; font-size: 27px; background: var(--grad); box-shadow: 0 8px 20px rgba(var(--accent-rgb), 0.35); }
-.role-card b { display: block; font-size: 17px; margin-bottom: 2px; }
-.role-card span.d { font-size: 12.5px; color: var(--soft); line-height: 1.4; }
+.role-brand { display: flex; flex-direction: column; align-items: center; gap: 4px; font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size: 19px; color: #a8742a; letter-spacing: 0.02em; text-shadow: 0 1px 8px rgba(255, 255, 255, 0.7); }
+.role-title { font-family: 'Playfair Display', 'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size: 31px; line-height: 1.18; text-align: center; margin: 8px 0 0; font-weight: 500; color: #4a3236; text-shadow: 0 1px 14px rgba(255, 255, 255, 0.65); }
+.role-sep { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px; } .role-sep i { width: 64px; height: 1px; background: linear-gradient(90deg, transparent, #d9808c); } .role-sep i:last-child { background: linear-gradient(270deg, transparent, #d9808c); }
+/* Liquid glass: shaffof, xira orqa fon, yorug chekka va ichki yaltirash */
+.role-card { position: relative; width: 100%; text-align: left; border-radius: 28px; padding: 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; border: 1px solid rgba(255, 255, 255, 0.62);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.14) 55%, rgba(255, 255, 255, 0.28));
+  -webkit-backdrop-filter: blur(22px) saturate(1.9) brightness(1.06); backdrop-filter: blur(22px) saturate(1.9) brightness(1.06);
+  box-shadow: 0 14px 38px rgba(150, 70, 90, 0.2), inset 0 1.5px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(255, 255, 255, 0.28), inset 0 0 22px rgba(255, 255, 255, 0.16); transition: transform 0.25s var(--ease), box-shadow 0.25s; overflow: hidden; }
+.role-card::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(115deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 38%); opacity: 0.55; }
+.role-card:active { transform: scale(0.975); }
+.role-card .txt { position: relative; min-width: 0; }
+.role-card .chev { position: relative; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #9b6a62; background: rgba(255, 255, 255, 0.4); border: 1px solid rgba(255, 255, 255, 0.75); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+.role-card .ico { position: relative; width: 58px; height: 58px; border-radius: 19px; display: grid; place-items: center; font-size: 28px; background: linear-gradient(145deg, rgba(255, 196, 196, 0.85), rgba(233, 140, 150, 0.7)); border: 1px solid rgba(255, 255, 255, 0.7); box-shadow: 0 8px 20px rgba(210, 100, 120, 0.3), inset 0 1.5px 0 rgba(255, 255, 255, 0.85); }
+.role-card b { display: block; font-size: 17px; margin-bottom: 3px; color: #3d2a2e; }
+.role-card span.d { font-size: 12.5px; color: #6d5558; line-height: 1.4; }
 
 /* toast */
 #toasts { position: fixed; left: 0; right: 0; bottom: calc(var(--sa-bottom) + 96px); z-index: 300; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
