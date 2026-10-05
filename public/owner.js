@@ -1,4 +1,4 @@
-/* owner.js — egasi/hammuallif kabineti: yadro (holat, avtosaqlash, UI-kit), yaratish ustasi, Bosh, Dizayn, Yana (AI, nashr, maxfiylik,
+/* owner.js — egasi/hammuallif kabineti: yadro (holat, avtosaqlash, UI-kit), yaratish ustasi, Bosh, Dizayn, Yana (nashr, maxfiylik,
    bildirishnoma, eslatma, hammuallif). Kontent muharriri — owner-content.js, mehmonlar/statistika — owner-guests.js. */
 (function () {
   const { h, t, $, api, haptic, toast, safe, clear, formatDate, tg } = Core;
@@ -249,7 +249,7 @@
   }
 
   // ================= YARATISH USTASI =================
-  function wizard() {
+  function wizard(replace) {
     const f = { groom: '', bride: '', date: '', ceremonyTime: '14:00', banquetTime: '18:00', template: 't01' };
     let step = 1;
     const box = h('div', { class: 'o-wiz' });
@@ -265,7 +265,7 @@
         box.append(h('div', { class: 'o-wiz-hero' }, h('div', null, '💍'), h('h1', null, t('o.wizTitle')), h('p', null, t('o.wizSub'))), ui.card(
           ui.field(t('o.groom'), g), ui.field(t('o.bride'), b), ui.field(t('o.date'), d), h('div', { class: 'o-row2' }, ui.field(t('o.nikoh'), c), ui.field(t('o.banquet'), q)), err),
           ui.btn(t('o.next'), () => { if (!f.groom.trim() || !f.bride.trim() || !f.date) { err.hidden = false; haptic('notify', 'error'); return; } step = 2; draw(); }, 'primary'),
-          ui.btn(t('o.exit'), () => S.onExit && S.onExit(), 'ghost'));
+          ui.btn(t('o.exit'), () => (replace ? ns.askResume() : S.onExit && S.onExit()), 'ghost'));
       } else {
         box.append(h('div', { class: 'o-wiz-hero' }, h('h1', null, t('o.pickTemplate')), h('p', null, t('o.pickTemplateSub'))), ns.templateGrid(() => f.template, (id) => { f.template = id; draw(); }),
           h('div', { class: 'o-sticky-actions' }, ui.btn(t('o.back'), () => { step = 1; draw(); }, 'ghost'), ui.btn(t('o.create'), create, 'primary', { id: 'wiz-create' })));
@@ -276,9 +276,9 @@
       const tpl = C.getTemplate(f.template), pal = C.getPalette(tpl.palette);
       const startsAt = (() => { const d = new Date(`${f.date}T${f.ceremonyTime || '12:00'}:00`); return Number.isNaN(d.getTime()) ? null : d.toISOString(); })();
       try {
-        const r = await api('/api/owner/save', { wedding: { groom: f.groom.trim(), bride: f.bride.trim(), date: f.date, startsAt, ceremonyTime: f.ceremonyTime || null, banquetTime: f.banquetTime || null, template: tpl.id, font: tpl.font, theme: { id: pal.id }, content: { intro: { style: tpl.intro } } } });
+        const r = await api('/api/owner/save', { wedding: { groom: f.groom.trim(), bride: f.bride.trim(), date: f.date, startsAt, ceremonyTime: f.ceremonyTime || null, banquetTime: f.banquetTime || null, template: tpl.id, font: tpl.font, theme: { id: pal.id }, content: { intro: { style: tpl.intro } }, ...(replace ? { visibility: S.draft.visibility, settings: S.draft.settings } : {}) }, ...(replace ? { base: S.version, force: true } : {}) });
         haptic('notify', 'success');
-        S.draft = r.wedding; S.prevHas = hasContent(r.wedding.content); S.version = r.version; S.links = r.links; S.role = 'owner'; S.members = [{ tgId: String(tgId()), role: 'owner', name: '' }]; S.media = { items: [], usage: 0, quota: 60 * 1024 * 1024 }; S.me = { wedding: r.wedding };
+        S.draft = r.wedding; S.prevHas = hasContent(r.wedding.content); S.version = r.version; S.links = r.links; S.role = 'owner'; if (!replace) { S.members = [{ tgId: String(tgId()), role: 'owner', name: '' }]; S.media = { items: [], usage: 0, quota: 60 * 1024 * 1024 }; } S.me = { wedding: r.wedding };
         mainShell(); go('home');
         setTimeout(() => toast(t('o.created')), 400);
       } catch (e) { btn.disabled = false; btn.textContent = t('o.create'); ui.err(e); }
@@ -359,7 +359,25 @@
     if (e.type === 'cohost') return { ico: '💑', txt: t('o.evCohost', { name: who }) };
     return { ico: '•', txt: e.type };
   };
-  ns.eventRow = (e) => { const x = eventText(e); return h('div', { class: 'o-ev' }, h('span', { class: 'o-ev-i' }, x.ico), h('div', null, h('div', null, x.txt), h('small', null, ns.timeAgo(e.at)))); };
+  const pad2 = (n) => String(n).padStart(2, '0');
+  ns.fmtStamp = (iso) => { const d = new Date(iso); return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+  const personKey = (e) => (e.guestId ? 'g' + e.guestId : e.tgId ? 't' + e.tgId : 'n' + ((e.meta && e.meta.name) || ''));
+  ns.evCache = [];
+  // Hodisa qatori: aniq sana/vaqt ko'rinadi, bosilsa shu odamning barcha kirishlari ochiladi
+  ns.eventRow = (e) => {
+    const x = eventText(e);
+    return h('button', { type: 'button', class: 'o-ev', onclick: () => ns.openPersonLog(e) }, h('span', { class: 'o-ev-i' }, x.ico),
+      h('div', null, h('div', null, x.txt), h('small', null, `${ns.fmtStamp(e.at)} · ${ns.timeAgo(e.at)}`)));
+  };
+  ns.openPersonLog = (e) => {
+    const key = personKey(e), who = (e.meta && e.meta.name) || t('o.someone');
+    const list = ns.evCache.filter((x) => personKey(x) === key);
+    const opens = list.filter((x) => x.type === 'open'), first = opens[opens.length - 1], last = opens[0];
+    const rows = list.map((x) => { const y = eventText(x); return h('div', { class: 'o-ev o-ev-log' }, h('span', { class: 'o-ev-i' }, y.ico), h('div', null, h('div', null, y.txt), h('small', null, ns.fmtStamp(x.at)))); });
+    ui.sheet(who, h('div', { class: 'o-col' },
+      h('div', { class: 'o-log-sum' }, h('div', null, h('small', null, t('o.firstOpen')), h('b', null, first ? ns.fmtStamp(first.at) : '—')), h('div', null, h('small', null, t('o.lastOpen')), h('b', null, last ? ns.fmtStamp(last.at) : '—')), h('div', null, h('small', null, t('o.openCount')), h('b', null, String(opens.length)))),
+      h('h3', { class: 'o-h3' }, t('o.history')), h('div', { class: 'o-feed' }, rows)));
+  };
 
   ns.screens.home = () => {
     const d = S.draft;
@@ -377,7 +395,7 @@
         ? [ui.btn('📤 ' + t('o.shareLink'), () => ui.share(S.links.general, t('o.shareText')), 'primary'), ui.btn('📋', () => ui.copy(S.links.general), 'ghost small icon', { 'aria-label': 'Copy' })]
         : [ui.btn('🚀 ' + t('o.publishNow'), () => ns.togglePublish(true), 'primary')])));
     wrap.append(h('div', { class: 'o-quick' },
-      ui.btn('👁 ' + t('o.preview'), () => ui.fullPreview(), 'ghost'), ui.btn('✏️ ' + t('o.editContent'), () => go('content'), 'ghost'), ui.btn('🪄 ' + t('o.aiBuilder'), () => ns.openAiBuilder(), 'ghost')));
+      ui.btn('👁 ' + t('o.preview'), () => ui.fullPreview(), 'ghost'), ui.btn('✏️ ' + t('o.editContent'), () => go('content'), 'ghost')));
     wrap.append(kpi, ui.card(h('h3', { class: 'o-h3' }, t('o.readiness')), checklist), ui.card(h('h3', { class: 'o-h3' }, t('o.liveFeed'), h('i', { class: 'o-live' })), feed));
 
     const paintAn = (an) => {
@@ -397,6 +415,7 @@
     const loadFeed = async () => {
       try {
         const r = await api('/api/owner/activity', { since: 0 });
+        ns.evCache = r.events;
         clear(feed);
         if (!r.events.length) feed.append(ui.empty('📭', t('o.noActivity')));
         r.events.slice(0, 12).forEach((e) => feed.append(ns.eventRow(e)));
@@ -475,14 +494,11 @@
     return wrap;
   };
 
-  // ================= YANA (AI, nashr, maxfiylik, bildirishnoma, eslatma, hammuallif, til) =================
+  // ================= YANA (nashr, maxfiylik, bildirishnoma, eslatma, hammuallif, til) =================
   ns.screens.more = () => {
     const d = S.draft, owner = S.role === 'owner';
     const wrap = h('div', { class: 'o-screen' });
     wrap.append(ui.title(t('o.moreTitle')));
-
-    // AI studiya
-    wrap.append(h('div', { class: 'o-ai-card' }, h('div', { class: 'o-ai-ico' }, '🪄'), h('div', null, h('b', null, t('o.aiStudio')), h('p', null, t('o.aiStudioSub'))), ui.btn(t('o.open'), () => ns.openAiBuilder(), 'primary small')));
 
     // Nashr + maxfiylik
     const pubCard = ui.card(h('h3', { class: 'o-h3' }, t('o.publishing')));
@@ -525,75 +541,6 @@
     return wrap;
   };
 
-  // ================= AI =================
-  const AI_LANGS = [{ id: 'uz', label: "O'zbek" }, { id: 'uz-cyrl', label: 'Ўзбек' }, { id: 'ru', label: 'Русский' }, { id: 'ja', label: '日本語' }, { id: 'en', label: 'English' }];
-  const curLang = () => (Core.getLang() === 'ja' ? 'ja' : Core.getLang());
-  function aiError(e) {
-    const code = e && e.data && e.data.error;
-    const map = { ai_not_configured: 'o.aiNotConfigured', ai_limit: 'o.aiLimit', ai_busy: 'o.aiBusy', ai_refused: 'o.aiRefused', ai_network: 'o.aiBusy' };
-    toast(t(map[code] || 'o.aiFail'), 'err');
-  }
-
-  ns.openAiBuilder = () => {
-    const d = S.draft; const f = { style: '', city: '', notes: '', language: curLang() === 'uz' ? 'uz' : curLang() };
-    const out = h('div', { class: 'o-ai-out' });
-    const gen = ui.btn('✨ ' + t('o.aiGenerate'), async () => {
-      gen.disabled = true; gen.textContent = t('o.aiThinking'); clear(out); out.append(ui.spinner());
-      try {
-        const r = await api('/api/owner/ai/build', { brief: { ...f, groom: d.groom, bride: d.bride, date: d.date, ceremonyTime: d.ceremonyTime, banquetTime: d.banquetTime, venue: d.content.location.name } }, { timeout: 100000 });
-        haptic('notify', 'success'); showResult(r.result);
-      } catch (e) { clear(out); aiError(e); } finally { gen.disabled = false; gen.textContent = '✨ ' + t('o.aiGenerate'); }
-    }, 'primary');
-    function showResult(res) {
-      clear(out);
-      const tp = C.getTemplate(res.template);
-      out.append(h('div', { class: 'o-ai-res' },
-        h('div', { class: 'o-ai-res-h' }, h('b', null, `${tp.name} · ${C.getFont(res.font).name}`), h('div', { class: 'o-ai-sw' }, [res.theme.bg, res.theme.accent, res.theme.ink].map((c) => h('i', { style: { background: c } })))),
-        res.message && h('p', { class: 'o-ai-msg' }, res.message),
-        h('div', { class: 'o-ai-counts' }, [`📖 ${res.content.story.length}`, `📅 ${res.content.schedule.length}`, `🍽 ${res.content.menu.length}`, `👗 ${res.content.dress.colors.length}`, `📝 ${res.content.custom.length}`].map((x) => h('span', null, x))),
-        ui.btn(t('o.aiApply'), async () => {
-          const hasContent = d.content.story.length || d.content.schedule.length || d.message;
-          if (hasContent && !(await ui.confirm(t('o.aiReplaceConfirm'), t('o.aiApply')))) return;
-          applyAi(res); sheetCtl.close(); haptic('notify', 'success'); toast(t('o.aiApplied')); renderTab();
-        }, 'primary'), ui.btn(t('o.aiAgain'), () => gen.click(), 'ghost')));
-    }
-    const body = h('div', { class: 'o-col' }, h('p', { class: 'o-muted' }, t('o.aiBuilderSub')),
-      ui.field(t('o.aiStyle'), h('input', { class: 'o-input', placeholder: t('o.aiStylePh'), maxlength: 200, oninput: (e) => { f.style = e.target.value; } })),
-      ui.field(t('o.aiCity'), h('input', { class: 'o-input', maxlength: 80, oninput: (e) => { f.city = e.target.value; } })),
-      ui.field(t('o.aiNotes'), h('textarea', { class: 'o-input', rows: 3, maxlength: 500, placeholder: t('o.aiNotesPh'), oninput: (e) => { f.notes = e.target.value; } })),
-      ui.field(t('o.aiLang'), ui.chips(AI_LANGS, () => f.language, (v) => { f.language = v; })), gen, out);
-    const sheetCtl = ui.sheet('🪄 ' + t('o.aiBuilder'), body, { tall: true });
-  };
-
-  // AI natijasini qoralamaga qo'llash: ismlar/sana/joy/media/RSVP saqlanadi, dizayn va matnlar almashadi
-  function applyAi(res) {
-    const d = S.draft, c = d.content, rc = res.content;
-    d.template = res.template; d.theme = res.theme; d.font = res.font; d.message = res.message || d.message;
-    c.intro.style = rc.intro.style || c.intro.style; c.hero.tagline = rc.hero.tagline || c.hero.tagline;
-    c.story = rc.story; c.schedule = rc.schedule; c.dress = rc.dress; c.menu = rc.menu;
-    // AI maxsus bo'limlari: eskilarini almashtiramiz; bo'limlar tartibi/yoqilganligi AI natijasidan
-    // Bo'limlar: egasining tartibi va yoqilganligi saqlanadi (galereya, video...), AI to'ldirganlari yoqiladi, maxsus bo'limlar AI'nikiga almashadi
-    const aiOn = new Map(rc.sections.map((x) => [x.id, x.on]));
-    c.custom = rc.custom;
-    c.sections = [...c.sections.filter((x) => !x.id.startsWith('custom:')).map((x) => ({ id: x.id, on: x.on || aiOn.get(x.id) === true })), ...rc.sections.filter((x) => x.id.startsWith('custom:'))];
-    touch();
-  }
-
-  // Matn yozuvchi: maydon yonidagi ✨ tugmasi shuni ochadi
-  ns.aiText = (kind, current, onUse) => {
-    const f = { tone: 'warm', language: curLang(), notes: '' };
-    const result = h('textarea', { class: 'o-input', rows: 5, maxlength: 1500, placeholder: t('o.aiResultPh') });
-    const use = ui.btn(t('o.aiUse'), () => { onUse(result.value.trim()); sheetCtl.close(); }, 'primary'); use.hidden = true;
-    const gen = ui.btn('✨ ' + t('o.aiGenerate'), async () => {
-      gen.disabled = true; gen.textContent = t('o.aiThinking');
-      try { const r = await api('/api/owner/ai/text', { kind, tone: f.tone, language: f.language, current: current(), notes: f.notes }, { timeout: 60000 }); result.value = r.text; use.hidden = false; haptic('notify', 'success'); }
-      catch (e) { aiError(e); } finally { gen.disabled = false; gen.textContent = '✨ ' + t('o.aiGenerate'); }
-    }, 'ghost');
-    const tones = ['warm', 'formal', 'playful', 'poetic', 'short'].map((x) => ({ id: x, label: t('o.tone_' + x) }));
-    const sheetCtl = ui.sheet('✨ ' + t('o.aiWriter'), h('div', { class: 'o-col' }, ui.field(t('o.aiTone'), ui.chips(tones, () => f.tone, (v) => { f.tone = v; })), ui.field(t('o.aiLang'), ui.chips(AI_LANGS, () => f.language, (v) => { f.language = v; })),
-      ui.field(t('o.aiNotes'), h('input', { class: 'o-input', maxlength: 300, placeholder: t('o.aiNotesPh'), oninput: (e) => { f.notes = e.target.value; } })), gen, result, use), { tall: true });
-  };
-
   // ================= START =================
   ns.start = async ({ root, onExit }) => {
     S.root = root; S.onExit = onExit;
@@ -604,6 +551,21 @@
     document.body.dataset.invdark = '0';
     Core.setChrome('#fbf8f2');
     if (!S.draft) { clear(root); root.className = 'view owner-root is-active'; root.append(h('div', { class: 'o-main wiz' }, wizard())); return; }
+    // Har safar kirganda: eski holatda davom etish yoki yangidan to'ldirish
+    if (S.role === 'owner') { ns.askResume(); return; }
     mainShell(); go('home');
+  };
+
+  ns.askResume = () => {
+    const d = S.draft, root = S.root;
+    clear(root); root.className = 'view owner-root is-active';
+    root.append(h('div', { class: 'o-main wiz' }, h('div', { class: 'o-wiz' },
+      h('div', { class: 'o-wiz-hero' }, h('div', null, '💍'), h('h1', null, t('o.resumeTitle')), h('p', null, t('o.resumeSub', { names: `${d.groom} & ${d.bride}` }))),
+      ui.btn('▶️ ' + t('o.resumeKeep'), () => { mainShell(); go('home'); }, 'primary'),
+      ui.btn('🆕 ' + t('o.resumeNew'), async () => {
+        if (!(await ui.confirm(t('o.resumeNewConfirm'), t('o.resumeNew'), true))) return;
+        clear(root); root.append(h('div', { class: 'o-main wiz' }, wizard(true)));
+      }, 'ghost'),
+      ui.btn(t('o.exit'), () => S.onExit && S.onExit(), 'ghost'))));
   };
 })();

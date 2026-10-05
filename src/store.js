@@ -249,7 +249,7 @@ async function activity(weddingId, sinceId = 0, limit = 40) {
   const r = await q(
     `SELECT id, type, guest_id, tg_id, meta, created_at FROM events
       WHERE wedding_id = $1 AND id > $2 ORDER BY id DESC LIMIT $3`, [weddingId, sinceId, limit]);
-  return r.rows.map((e) => ({ id: Number(e.id), type: e.type, guestId: e.guest_id, meta: parse(e.meta, {}), at: e.created_at }));
+  return r.rows.map((e) => ({ id: Number(e.id), type: e.type, guestId: e.guest_id, tgId: e.tg_id, meta: parse(e.meta, {}), at: e.created_at }));
 }
 
 // Analitika: JS'da jamlanadi (portativ SQL, hodisalar soni kichik/o'rtacha)

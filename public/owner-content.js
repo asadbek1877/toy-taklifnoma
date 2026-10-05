@@ -13,8 +13,7 @@
   const controls = (arr, i, redraw, onRemove) => h('div', { class: 'o-ctl' },
     ui.btn('↑', () => { if (move(arr, i, -1)) { ns.touch(); redraw(); } }, 'ghost small icon'), ui.btn('↓', () => { if (move(arr, i, 1)) { ns.touch(); redraw(); } }, 'ghost small icon'),
     ui.btn('✕', () => { if (onRemove) onRemove(); arr.splice(i, 1); ns.touch(); redraw(); }, 'ghost small icon danger'));
-  const aiBtn = (kind, get, set) => h('button', { type: 'button', class: 'o-ai-mini', onclick: () => ns.aiText(kind, get, (txt) => { set(txt); ns.touch(); ns.renderTab(); }) }, '✨ AI');
-  const fieldAi = (label, control, kind, get, set) => h('div', { class: 'o-field' }, h('div', { class: 'o-label-row' }, h('span', { class: 'o-label' }, label), aiBtn(kind, get, set)), control);
+  const fieldAi = (label, control) => h('div', { class: 'o-field' }, h('span', { class: 'o-label' }, label), control);
 
   // Rasm tanlash tugmasi: ko'rsatkich + tanlash/olib tashlash
   function photoPicker(get, set, label) {

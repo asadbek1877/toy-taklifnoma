@@ -3,7 +3,6 @@
 //   /guests/* /groups/*         — mehmonlar boshqaruvi, import, eksport
 //   /analytics /activity        — statistika va real-time lenta
 //   /cohost/*                   — hammuallif taklifi
-//   /ai/build /ai/text          — AI
 
 const crypto = require('crypto');
 const express = require('express');
@@ -13,14 +12,12 @@ const CATALOG = require('../../public/templates.js');
 const store = require('../store');
 const outbox = require('../outbox');
 const db = require('../db');
-const ai = require('../ai');
 const notify = require('../notify');
 const { startLink } = require('../bot');
 const { cleanWedding, cleanContent, cleanSettings, clip } = require('../validate');
 const { requireUser, requireMember, wrap } = require('../auth');
 
 const MAX_GUESTS = 500;
-const AI_DAILY_LIMIT = Number(process.env.AI_DAILY_LIMIT) || 30;
 
 // ---------- yordamchilar ----------
 const version = (row) => new Date(row.updated_at).getTime();
@@ -58,11 +55,11 @@ router.post('/me', wrap(async (req, res) => {
   const user = requireUser(req, res);
   if (!user) return;
   const m = await store.getMembership(user.id);
-  if (!m) return res.json({ wedding: null, aiConfigured: ai.isConfigured() });
+  if (!m) return res.json({ wedding: null });
   const members = (await store.listMembers(m.wedding.id)).map((x) => ({ tgId: String(x.tg_id), role: x.role, name: x.name }));
   res.json({
     role: m.role, wedding: editorWedding(m.wedding), links: await links(m.wedding), members,
-    media: await mediaInfo(m.wedding.id), aiConfigured: ai.isConfigured(),
+    media: await mediaInfo(m.wedding.id),
     catalog: { templates: CATALOG.TEMPLATES.length },
   });
 }));
@@ -286,48 +283,6 @@ cohost.post('/accept', wrap(async (req, res) => {
     text: `💑 <b>${require('../messages').esc([user.first_name, user.last_name].filter(Boolean).join(' ') || 'Foydalanuvchi')}</b> hammuallif sifatida qo'shildi\n💒 ${notify.title(row)}`,
   });
   res.json({ ok: true });
-}));
-
-// ---------- AI ----------
-async function aiGuard(req, res) {
-  const m = await requireMember(req, res);
-  if (!m) return null;
-  if (!ai.isConfigured()) { res.status(503).json({ error: 'ai_not_configured' }); return null; }
-  const used = await store.bumpAiUsage(m.user.id);
-  if (used > AI_DAILY_LIMIT) { res.status(429).json({ error: 'ai_limit', limit: AI_DAILY_LIMIT }); return null; }
-  return m;
-}
-function aiFail(res, err) {
-  const e = err && err.aiCode ? { code: err.aiCode, status: err.aiCode === 'refused' ? 422 : 502 } : ai.mapError(err);
-  console.error('[ai] xatolik:', e.code, err && err.message);
-  res.status(e.status).json({ error: `ai_${e.code}` });
-}
-
-router.post('/ai/build', wrap(async (req, res) => {
-  const m = await aiGuard(req, res);
-  if (!m) return;
-  const b = req.body.brief || {};
-  try {
-    const result = await ai.buildInvitation({
-      groom: b.groom || m.wedding.groom, bride: b.bride || m.wedding.bride, date: b.date || m.wedding.wedding_date,
-      ceremonyTime: b.ceremonyTime || m.wedding.ceremony_time, banquetTime: b.banquetTime || m.wedding.banquet_time,
-      city: b.city, venue: b.venue || m.wedding.venue_name, style: b.style, notes: b.notes, language: b.language,
-    });
-    res.json({ result });
-  } catch (err) { aiFail(res, err); }
-}));
-
-router.post('/ai/text', wrap(async (req, res) => {
-  const m = await aiGuard(req, res);
-  if (!m) return;
-  const b = req.body;
-  try {
-    const text = await ai.writeText({
-      kind: b.kind, tone: b.tone, language: b.language, current: b.current,
-      context: { groom: m.wedding.groom, bride: m.wedding.bride, date: m.wedding.wedding_date, venue: m.wedding.venue_name, notes: b.notes },
-    });
-    res.json({ text });
-  } catch (err) { aiFail(res, err); }
 }));
 
 module.exports = { router, cohost, editorWedding };

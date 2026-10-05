@@ -159,7 +159,7 @@
       body.append(ui.card(h('h3', { class: 'o-h3' }, t('o.liveFeed'), h('i', { class: 'o-live' })), feed));
     };
     const loadFeed = async () => {
-      try { const r = await api('/api/owner/activity', { since: 0 }); clear(feed); if (!r.events.length) feed.append(ui.empty('📭', t('o.noActivity'))); r.events.forEach((e) => feed.append(ns.eventRow(e))); } catch (e) { /* keyingi poll */ }
+      try { const r = await api('/api/owner/activity', { since: 0 }); clear(feed); ns.evCache = r.events; if (!r.events.length) feed.append(ui.empty('📭', t('o.noActivity'))); r.events.forEach((e) => feed.append(ns.eventRow(e))); } catch (e) { /* keyingi poll */ }
     };
     api('/api/owner/analytics', { days: 14 }).then((an) => { draw(an); loadFeed(); }).catch((e) => { clear(body); body.append(ui.empty('📡', t('o.network')), ui.btn(t('o.retry'), () => ns.renderTab(), 'ghost')); });
     ns.startPolling(loadFeed, 12000);

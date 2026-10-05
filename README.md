@@ -19,7 +19,6 @@
 | **Аналитика** | Link Analytics (переходы из бота → открытия → ответы), график, группы, не открывшие | `src/store.js` |
 | **Уведомления** | Real-time (бот + лента), «гость открыл приглашение», автоматические напоминания (7д/1д/3ч, не ответившим 14д/7д) | `src/notify.js`, `src/reminders.js` |
 | **Команда** | Co-host: приглашение по ссылке, совместное редактирование с защитой от конфликтов | `src/routes/owner.js` |
-| **AI** | AI Invitation Builder (шаблон+цвета+шрифт+все тексты), AI Wedding Text (тон × язык) — реальные вызовы Claude | `src/ai.js` |
 | **Надёжность** | Transactional outbox, идемпотентность, очередь ответов на устройстве, автосохранение с локальной копией | `OUTBOX.md` |
 
 ## Архитектура
@@ -30,7 +29,6 @@ Telegram ──► bot.js (polling) ──┐
 Mini App (public/, отдаётся ────┘      │   /api/invite  /api/owner  /api/cohost  /api/media  /api/rsvp  /api/admin
  самим сервером на /app/)              ├── outbox worker  ──► Telegram (повторы, лимиты, документы)
                                        ├── reminders (раз в минуту, дедупликация через outbox)
-                                       └── ai.js ──► Claude API (официальный SDK, JSON-схема на выходе)
 ```
 
 * **Доступ.** Любой запрос подписан Telegram (`initData`, HMAC-SHA256 токеном бота) и проверяется на сервере. `owner_id` **никогда** не берётся из тела запроса.
@@ -65,7 +63,7 @@ Mini App (public/, отдаётся ────┘      │   /api/invite  /api
 
 * Публично: `GET /api/invite/w/:code`, `GET /api/invite/g/:token`, `POST /api/invite/view`, `GET /api/media/:id` (Range), `POST /api/rsvp`
 * Владелец/со-ведущий (подпись обязательна): `/api/owner/{me,save,publish}`, `/guests/{list,save,delete,import,export}`, `/groups/{save,delete}`, `/analytics`, `/activity`,
-  `/cohost/{invite,remove}`, `/ai/{build,text}`, `/media/{image,video,audio,delete,list}`; `/api/cohost/{info,accept}`
+  `/cohost/{invite,remove}`, `/media/{image,video,audio,delete,list}`; `/api/cohost/{info,accept}`
 * Администратор: `/api/admin/outbox`, `/api/admin/outbox/retry`; в боте: `/status`, `/retry`
 
 ## Деплой

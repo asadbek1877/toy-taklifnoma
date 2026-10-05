@@ -40,11 +40,10 @@ for (const lang of ['uz', 'ru', 'ja']) {
 }
 const ownerFiles = ['owner.js', 'owner-content.js', 'owner-guests.js'];
 const ownerKeys = new Set(usedKeys(ownerFiles, /['"](o\.[A-Za-z0-9_]+)['"]/g).filter((k) => !k.endsWith('_')));
-// dinamik prefikslar: 'o.sub_' + id, 'o.sec_' + id, 'o.intro_' + i, 'o.tone_' + x, k + 'Hint', titleKey + 'Hint'
+// dinamik prefikslar: 'o.sub_' + id, 'o.sec_' + id, 'o.intro_' + i, k + 'Hint', titleKey + 'Hint'
 ['basics', 'story', 'schedule', 'location', 'dress', 'menu', 'extra', 'media', 'rsvp', 'sections'].forEach((x) => ownerKeys.add('o.sub_' + x));
 ['countdown', 'story', 'schedule', 'location', 'dress', 'menu', 'gallery', 'video'].forEach((x) => ownerKeys.add('o.sec_' + x));
 ['envelope', 'cinematic', 'none'].forEach((x) => ownerKeys.add('o.intro_' + x));
-['warm', 'formal', 'playful', 'poetic', 'short'].forEach((x) => ownerKeys.add('o.tone_' + x));
 ['o.visPublicHint', 'o.visPrivateHint', 'o.videoHint', 'o.musicHint'].forEach((x) => ownerKeys.add(x));
 for (const lang of ['uz', 'ru']) {
   const missing = [...ownerKeys].filter((k) => !both[lang][k]);
