@@ -1,5 +1,7 @@
 // Bu fayl Telegram bot bilan bog'liq hamma narsani boshqaradi.
 
+const fs = require('fs');
+const path = require('path');
 const TelegramBot = require('node-telegram-bot-api');
 const { getAllRsvps } = require('./db');
 const store = require('./store');
@@ -103,6 +105,7 @@ const TEXT = {
   uz: {
     welcome: "Ассалому алайкум! 💍 Бу — тўй таклифномалари боти. Таклифнома яратиш ёки очиш учун тугмани босинг 👇",
     open: 'Очиш 💌',
+    inviteCap: '💌 Сизни тўйга таклиф қилишади!',
     invite: (title) => `💌 ${title}\n\nТаклифномани очиш учун тугмани босинг 👇`,
     openInvite: 'Таклифномани очиш 💌',
     notFound: 'Бу ҳавола ишламайди. Тўй эгасидан янги ҳавола сўранг.',
@@ -114,6 +117,7 @@ const TEXT = {
   ru: {
     welcome: 'Здравствуйте! 💍 Это бот свадебных приглашений. Нажмите кнопку, чтобы создать или открыть приглашение 👇',
     open: 'Открыть 💌',
+    inviteCap: '💌 Вас приглашают на свадьбу!',
     invite: (title) => `💌 ${title}\n\nНажмите кнопку, чтобы открыть приглашение 👇`,
     openInvite: 'Открыть приглашение 💌',
     notFound: 'Эта ссылка не работает. Попросите у владельца свадьбы новую ссылку.',
@@ -125,6 +129,7 @@ const TEXT = {
   ja: {
     welcome: 'ようこそ！💍 結婚式の招待状ボットです。ボタンを押して招待状を作成・開封してください 👇',
     open: '開く 💌',
+    inviteCap: '💌 結婚式にご招待します！',
     invite: (title) => `💌 ${title}\n\nボタンを押して招待状を開いてください 👇`,
     openInvite: '招待状を開く 💌',
     notFound: 'このリンクは無効です。新郎新婦に新しいリンクをお願いしてください。',
@@ -139,6 +144,32 @@ const tr = (msg) => TEXT[(msg.from && msg.from.language_code || '').slice(0, 2)]
 function webAppButton(text, url) {
   return { reply_markup: { inline_keyboard: [[{ text, web_app: { url } }]] } };
 }
+// Salomlashuv: ovozsiz video (animatsiya) + qisqa matn + tugma + to'liq ekranli effekt (konfetti).
+// Video bir marta yuklanadi, keyin Telegram file_id bilan yuboriladi. Har qanday xatoda — oddiy matn (eski xulq).
+const GREETING_VIDEO = path.join(__dirname, '..', 'public', 'welcome.mp4');
+const GREETING_EFFECT = process.env.GREETING_EFFECT === 'off' ? null : (process.env.GREETING_EFFECT || '5046509860389126442'); // 🎉
+let greetingFileId = null;
+async function sendGreeting(chatId, caption, markup) {
+  if (process.env.GREETING_VIDEO === 'off' || !fs.existsSync(GREETING_VIDEO)) return bot.sendMessage(chatId, caption, markup);
+  const base = { caption, ...markup };
+  const media = greetingFileId || fs.createReadStream(GREETING_VIDEO);
+  const send = (opts) => bot.sendAnimation(chatId, media, opts, greetingFileId ? {} : { filename: 'welcome.mp4', contentType: 'video/mp4' });
+  try {
+    let msg;
+    try { msg = await send(GREETING_EFFECT ? { ...base, message_effect_id: GREETING_EFFECT } : base); }
+    catch (err) {
+      if (!/effect/i.test(String(err && err.message))) throw err;
+      msg = await bot.sendAnimation(chatId, greetingFileId || fs.createReadStream(GREETING_VIDEO), base, { filename: 'welcome.mp4', contentType: 'video/mp4' });
+    }
+    const a = msg && (msg.animation || msg.video);
+    if (a && a.file_id) greetingFileId = a.file_id;
+    return msg;
+  } catch (err) {
+    console.error('[greeting] video yuborilmadi, matn:', err.message);
+    greetingFileId = null;
+    return bot.sendMessage(chatId, caption, markup);
+  }
+}
 const appUrl = (query) => `${webAppUrl.replace(/\/$/, '')}/?${query}`;
 
 // /start [w_<kod> | g_<token> | c_<token>]
@@ -152,7 +183,7 @@ bot.onText(/^\/start(?:@\w+)?(?:\s+(\S+))?/, async (msg, match) => {
   }
 
   const m = match && match[1] && /^([wgc])_([\w-]{4,40})$/.exec(match[1]);
-  if (!m) return bot.sendMessage(chatId, t.welcome, webAppButton(t.open, webAppUrl));
+  if (!m) return sendGreeting(chatId, t.welcome, webAppButton(t.open, webAppUrl));
   const [, kind, key] = m;
   const from = msg.from || {};
 
@@ -178,7 +209,7 @@ bot.onText(/^\/start(?:@\w+)?(?:\s+(\S+))?/, async (msg, match) => {
     await store.logEvent({ weddingId: wedding.id, guestId: guest ? guest.id : null, type: 'link_start', tgId: from.id, meta: { name: [from.first_name, from.last_name].filter(Boolean).join(' '), username: from.username || null, link: kind } });
 
     const query = kind === 'g' ? `g=${encodeURIComponent(key)}` : `w=${encodeURIComponent(key)}`;
-    bot.sendMessage(chatId, t.invite(`${wedding.groom} & ${wedding.bride}`), webAppButton(t.openInvite, appUrl(query)));
+    sendGreeting(chatId, t.inviteCap, webAppButton(t.openInvite, appUrl(query)));
   } catch (err) {
     console.error('/start (deep-link) xatolik:', err.message);
     bot.sendMessage(chatId, t.welcome, webAppButton(t.open, webAppUrl));
