@@ -101,6 +101,7 @@
         h('div', { class: 'o-actions' }, ui.btn('➕ ' + t('o.add'), () => guestForm(null), 'primary small'), ui.btn('📥 ' + t('o.import'), importSheet, 'ghost small'), ui.btn('🏷 ' + t('o.groups'), groupsSheet, 'ghost small'),
           ui.btn('📤 CSV', async () => { if (!(await ui.confirm(t('o.exportConfirm'), t('o.send')))) return; try { await api('/api/owner/guests/export', {}); haptic('notify', 'success'); toast(t('o.exportQueued')); } catch (e) { ui.err(e); } }, 'ghost small')));
       const search = h('input', { class: 'o-input search', value: G.q, placeholder: '🔍 ' + t('o.search'), oninput: (e) => { G.q = e.target.value.trim().toLowerCase(); drawList(); } });
+      if (ns.focusSearch) { ns.focusSearch = false; setTimeout(() => search.focus(), 350); }
       filters.append(search, ui.chips([['all', 'o.fAll'], ['pending', 'o.fPending'], ['yes', 'o.fYes'], ['no', 'o.fNo'], ['unopened', 'o.fUnopened']].map(([id, k]) => ({ id, label: t(k) })), () => G.filter, (v) => { G.filter = v; drawList(); }, 'scroll'),
         G.data.groups.length ? ui.chips([{ id: 'all', label: t('o.allGroups') }, ...G.data.groups.map((x) => ({ id: x.id, label: `${x.emoji || ''} ${x.name}`.trim() })), { id: 'none', label: t('o.noGroup') }], () => G.group, (v) => { G.group = v; drawList(); }, 'scroll') : null);
       drawList();

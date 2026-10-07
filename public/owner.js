@@ -324,7 +324,8 @@
 
   function go(id) {
     S.tab = id;
-    stopPolling();
+    stopPolling(); clearInterval(S.cdTimer);
+    S.root.classList.toggle('home-mode', id === 'home');
     [...tabbarEl.children].forEach((b) => b.classList.toggle('on', b.dataset.id === id));
     renderTab();
   }
@@ -379,50 +380,120 @@
       h('h3', { class: 'o-h3' }, t('o.history')), h('div', { class: 'o-feed' }, rows)));
   };
 
+  // Lucide (ISC) — SF Symbols'ga eng yaqin ochiq ikonkalar to'plami
+  const LUCIDE = {
+    "search": "<circle cx=\"11\" cy=\"11\" r=\"8\" /> <path d=\"m21 21-4.3-4.3\" />",
+    "bell": "<path d=\"M10.268 21a2 2 0 0 0 3.464 0\" /> <path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\" />",
+    "menu": "<line x1=\"4\" x2=\"20\" y1=\"12\" y2=\"12\" /> <line x1=\"4\" x2=\"20\" y1=\"6\" y2=\"6\" /> <line x1=\"4\" x2=\"20\" y1=\"18\" y2=\"18\" />",
+    "rocket": "<path d=\"M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z\" /> <path d=\"m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z\" /> <path d=\"M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0\" /> <path d=\"M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5\" />",
+    "users": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\" /> <circle cx=\"9\" cy=\"7\" r=\"4\" /> <path d=\"M22 21v-2a4 4 0 0 0-3-3.87\" /> <path d=\"M16 3.13a4 4 0 0 1 0 7.75\" />",
+    "camera": "<path d=\"M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z\" /> <circle cx=\"12\" cy=\"13\" r=\"3\" />",
+    "chart-column": "<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /> <path d=\"M18 17V9\" /> <path d=\"M13 17V5\" /> <path d=\"M8 17v-3\" />",
+    "check": "<path d=\"M20 6 9 17l-5-5\" />",
+    "eye": "<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" />",
+    "share-2": "<circle cx=\"18\" cy=\"5\" r=\"3\" /> <circle cx=\"6\" cy=\"12\" r=\"3\" /> <circle cx=\"18\" cy=\"19\" r=\"3\" /> <line x1=\"8.59\" x2=\"15.42\" y1=\"13.51\" y2=\"17.49\" /> <line x1=\"15.41\" x2=\"8.59\" y1=\"6.51\" y2=\"10.49\" />"
+  };
+  const lic = (name, size = 20, sw = 1.8) => { const e = document.createElement('span'); e.className = 'hm-ico'; e.innerHTML = `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[name]}</svg>`; return e; };
+  const seenKey = 'toy_seen_ev';
+  const getSeen = () => { try { return Number(localStorage.getItem(seenKey)) || 0; } catch (e) { return 0; } };
+  const setSeen = (n) => { try { localStorage.setItem(seenKey, String(n)); } catch (e) { /* ixtiyoriy */ } };
+
   ns.screens.home = () => {
+    Core.loadFont({ id: 'hm-playfair', gf: 'Playfair+Display:ital,wght@0,500;1,500' });
     const d = S.draft;
-    const wrap = h('div', { class: 'o-screen' });
-    const state = d.published ? (d.visibility === 'private' ? { k: 'o.stPrivate', c: 'priv' } : { k: 'o.stLive', c: 'live' }) : { k: 'o.stDraft', c: 'draft' };
-    const dl = daysLeft();
-    const kpi = h('div', { class: 'o-kpis' });
+    const wrap = h('div', { class: 'o-screen hm' });
+    const target = () => (d.startsAt ? new Date(d.startsAt) : new Date(`${d.date}T${d.ceremonyTime || '12:00'}:00`)).getTime();
     const feed = h('div', { class: 'o-feed' }, ui.spinner());
-    const checklist = h('div', { class: 'o-check' });
+    let latestId = 0, an = null;
 
-    wrap.append(h('div', { class: 'o-hero-card' },
-      h('div', { class: 'o-hero-top' }, h('span', { class: 'o-pill ' + state.c }, t(state.k)), h('span', { class: 'o-days' }, dl > 0 ? t('o.daysLeft', { n: dl }) : dl === 0 ? t('o.today') : t('o.passed'))),
-      h('h1', null, `${d.groom} & ${d.bride}`), h('p', null, formatDate(d.date) + (d.ceremonyTime ? ` · ${d.ceremonyTime}` : '')),
-      h('div', { class: 'o-hero-cta' }, d.published
-        ? [ui.btn('📤 ' + t('o.shareLink'), () => ui.share(S.links.general, t('o.shareText')), 'primary'), ui.btn('📋', () => ui.copy(S.links.general), 'ghost small icon', { 'aria-label': 'Copy' })]
-        : [ui.btn('🚀 ' + t('o.publishNow'), () => ns.togglePublish(true), 'primary')])));
-    wrap.append(h('div', { class: 'o-quick' },
-      ui.btn('👁 ' + t('o.preview'), () => ui.fullPreview(), 'ghost'), ui.btn('✏️ ' + t('o.editContent'), () => go('content'), 'ghost')));
-    wrap.append(kpi, ui.card(h('h3', { class: 'o-h3' }, t('o.readiness')), checklist), ui.card(h('h3', { class: 'o-h3' }, t('o.liveFeed'), h('i', { class: 'o-live' })), feed));
+    // --- yuqori qator: logotip + qidiruv / bildirishnoma / menyu ---
+    const dot = h('i', { class: 'hm-dot', hidden: true });
+    const bell = h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.liveFeed'), onclick: () => openFeed() }, lic('bell', 20), dot);
+    wrap.append(h('div', { class: 'hm-top' }, h('span', { class: 'hm-brand' }, t('o.hmBrand')),
+      h('div', { class: 'hm-icons' },
+        h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.search'), onclick: () => { haptic('impact', 'light'); ns.focusSearch = true; go('guests'); } }, lic('search', 20)),
+        bell,
+        h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.moreTitle'), onclick: () => { haptic('impact', 'light'); go('more'); } }, lic('menu', 20)))));
 
-    const paintAn = (an) => {
-      clear(kpi);
-      const k = (n, label) => h('div', { class: 'o-kpi' }, h('b', null, String(n)), h('small', null, label));
-      kpi.append(k(an.guests.total, t('o.kInvited')), k(an.guests.opened, t('o.kOpened')), k(an.rsvp.people, t('o.kComing')), k(an.guests.pending, t('o.kPending')));
-      const cc = d.content, items = [
-        [!!cc.hero.mediaId, 'o.chPhoto', () => go('content')], [!!d.message, 'o.chMessage', () => go('content')], [cc.story.length > 0, 'o.chStory', () => go('content')],
-        [cc.schedule.length > 0, 'o.chSchedule', () => go('content')], [!!(cc.location.name || cc.location.address), 'o.chLocation', () => go('content')],
-        [cc.gallery.length > 0, 'o.chGallery', () => go('content')], [an.guests.total > 0, 'o.chGuests', () => go('guests')], [d.published, 'o.chPublished', () => ns.togglePublish(true)],
-      ];
-      const done = items.filter((i) => i[0]).length;
-      clear(checklist);
-      checklist.append(h('div', { class: 'o-prog' }, h('i', { style: { width: Math.round((done / items.length) * 100) + '%' } })), h('small', null, `${done} / ${items.length}`),
-        h('div', { class: 'o-check-list' }, items.map(([ok, k, fn]) => h('button', { type: 'button', class: 'o-ck' + (ok ? ' ok' : ''), onclick: ok ? null : fn }, h('i', null, ok ? '✓' : ''), h('span', null, t(k))))));
+    // --- ismlar + sana ---
+    wrap.append(h('div', { class: 'hm-names' }, h('h1', null, d.groom, ' & ', h('br'), d.bride), h('p', null, formatDate(d.date) + (d.ceremonyTime ? ` · ${d.ceremonyTime}` : ''))));
+
+    // --- teskari sanoq (har soniya) ---
+    const cd = { d: h('b'), h: h('b'), m: h('b'), s: h('b') };
+    const cell = (k, label) => h('div', { class: 'hm-cd-c' }, cd[k], h('small', null, label));
+    const cdTitle = h('div', { class: 'hm-cd-t' });
+    wrap.append(h('div', { class: 'hm-card hm-cd' }, cdTitle, h('div', { class: 'hm-cd-row' }, cell('d', t('o.cdDays')), h('span', null, ':'), cell('h', t('o.cdHours')), h('span', null, ':'), cell('m', t('o.cdMin')), h('span', null, ':'), cell('s', t('o.cdSec')))));
+    const tick = () => {
+      let diff = Math.max(0, target() - Date.now());
+      cdTitle.textContent = target() > Date.now() ? t('o.cdTitle') : t('o.passed');
+      const days = Math.floor(diff / 86400000); diff -= days * 86400000;
+      const hrs = Math.floor(diff / 3600000); diff -= hrs * 3600000;
+      const mins = Math.floor(diff / 60000); diff -= mins * 60000;
+      cd.d.textContent = pad2(days); cd.h.textContent = pad2(hrs); cd.m.textContent = pad2(mins); cd.s.textContent = pad2(Math.floor(diff / 1000));
     };
+    tick();
+    clearInterval(S.cdTimer); S.cdTimer = setInterval(() => { if (!document.body.contains(wrap)) { clearInterval(S.cdTimer); return; } tick(); }, 1000);
+
+    // --- 2x2 kartalar ---
+    const ring = h('span', { class: 'hm-ring' });
+    const tiles = {
+      ready: h('b', null, '0 / 8'), guests: h('b', null, '0'), content: h('b', null, '0'), stats: h('b', null, '0'),
+    };
+    const cc = d.content;
+    const items = () => [
+      [!!cc.hero.mediaId, 'o.chPhoto', () => go('content')], [!!d.message, 'o.chMessage', () => go('content')], [cc.story.length > 0, 'o.chStory', () => go('content')],
+      [cc.schedule.length > 0, 'o.chSchedule', () => go('content')], [!!(cc.location.name || cc.location.address), 'o.chLocation', () => go('content')],
+      [cc.gallery.length > 0, 'o.chGallery', () => go('content')], [(an ? an.guests.total : 0) > 0, 'o.chGuests', () => go('guests')], [d.published, 'o.chPublished', () => ns.togglePublish(true)],
+    ];
+    const paintReady = () => {
+      const it = items(), done = it.filter((i) => i[0]).length, p = done / it.length;
+      tiles.ready.textContent = `${done} / ${it.length}`;
+      ring.style.setProperty('--p', String(Math.round(p * 360)) + 'deg');
+      ring.innerHTML = `<svg viewBox="0 0 36 36" width="34" height="34"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(176,132,62,.22)" stroke-width="3"/><circle cx="18" cy="18" r="15" fill="none" stroke="#b98a3e" stroke-width="3" stroke-linecap="round" stroke-dasharray="${(p * 94.25).toFixed(1)} 94.25" transform="rotate(-90 18 18)"/></svg>`;
+    };
+    const openChecklist = () => {
+      const it = items();
+      const ctl = ui.sheet(t('o.readiness'), h('div', { class: 'o-check' }, h('div', { class: 'o-prog' }, h('i', { style: { width: Math.round((it.filter((i) => i[0]).length / it.length) * 100) + '%' } })),
+        h('div', { class: 'o-check-list' }, it.map(([ok, k, fn]) => h('button', { type: 'button', class: 'o-ck' + (ok ? ' ok' : ''), onclick: ok ? null : () => { ctl.close(); fn(); } }, h('i', null, ok ? '✓' : ''), h('span', null, t(k)))))));
+    };
+    const tile = (icon, valueEl, label, fn) => h('button', { type: 'button', class: 'hm-card hm-tile', onclick: () => { haptic('impact', 'light'); fn(); } }, icon, h('div', { class: 'hm-tile-t' }, h('span', null, label), valueEl));
+    const statLabel = h('span', null, t('o.hmOpens'));
+    const statTile = tile(lic('chart-column', 26, 1.6), h('div', { class: 'hm-val' }, tiles.stats, statLabel), t('o.tabStats'), () => go('stats'));
+    wrap.append(h('div', { class: 'hm-grid' },
+      tile(ring, tiles.ready, t('o.readiness'), openChecklist),
+      tile(lic('users', 26, 1.6), tiles.guests, t('o.tabGuests'), () => go('guests')),
+      tile(lic('camera', 26, 1.6), tiles.content, t('o.tabContent'), () => go('content')),
+      statTile));
+    paintReady();
+    tiles.content.textContent = String((cc.hero.mediaId ? 1 : 0) + cc.gallery.length);
+
+    // --- asosiy tugma ---
+    const main = d.published
+      ? h('button', { type: 'button', class: 'hm-cta', onclick: () => ui.share(S.links.general, t('o.shareText')) }, lic('share-2', 22, 1.8), t('o.shareLink'))
+      : h('button', { type: 'button', class: 'hm-cta', onclick: () => ns.togglePublish(true) }, lic('rocket', 22, 1.8), t('o.publishNow'));
+    wrap.append(main, h('button', { type: 'button', class: 'hm-link', onclick: () => ui.fullPreview() }, lic('eye', 16, 1.8), t('o.preview')));
+
+    // --- jonli lenta: qo'ng'iroqcha varag'ida ---
+    function openFeed() {
+      haptic('impact', 'light'); setSeen(latestId); dot.hidden = true;
+      ui.sheet(t('o.liveFeed'), h('div', { class: 'o-col' }, feed), { tall: true });
+    }
     const loadFeed = async () => {
       try {
         const r = await api('/api/owner/activity', { since: 0 });
         ns.evCache = r.events;
         clear(feed);
         if (!r.events.length) feed.append(ui.empty('📭', t('o.noActivity')));
-        r.events.slice(0, 12).forEach((e) => feed.append(ns.eventRow(e)));
-        S.lastEvent = r.events[0] ? r.events[0].id : 0;
+        r.events.slice(0, 30).forEach((e) => feed.append(ns.eventRow(e)));
+        latestId = r.events[0] ? r.events[0].id : 0; S.lastEvent = latestId;
+        dot.hidden = !(latestId > getSeen());
       } catch (e) { if (!feed.firstChild || feed.querySelector('.o-spin')) { clear(feed); feed.append(ui.empty('📡', t('o.network'))); } }
     };
-    api('/api/owner/analytics', { days: 14 }).then((an) => { S.an = an; paintAn(an); }).catch(() => { paintAn({ guests: { total: 0, opened: 0, pending: 0 }, rsvp: { people: 0 }, unique: { opens: 0 } }); });
+    const paintAn = (a) => {
+      an = a; tiles.guests.textContent = String(a.guests.total); tiles.stats.textContent = String((a.unique && a.unique.opens) || 0);
+      paintReady();
+    };
+    api('/api/owner/analytics', { days: 14 }).then((a) => { S.an = a; paintAn(a); }).catch(() => { paintAn({ guests: { total: 0, opened: 0, pending: 0 }, rsvp: { people: 0 }, unique: { opens: 0 } }); });
     loadFeed();
     startPolling(loadFeed, 12000); // real-time lenta
     return wrap;
