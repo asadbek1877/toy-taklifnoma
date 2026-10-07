@@ -382,6 +382,9 @@
 
   // Lucide (ISC) — SF Symbols'ga eng yaqin ochiq ikonkalar to'plami
   const LUCIDE = {
+    "pen-line": "<path d=\"M12 20h9\" /> <path d=\"M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z\" />",
+    "chevron-right": "<path d=\"m9 18 6-6-6-6\" />",
+    "chevron-down": "<path d=\"m6 9 6 6 6-6\" />",
     "search": "<circle cx=\"11\" cy=\"11\" r=\"8\" /> <path d=\"m21 21-4.3-4.3\" />",
     "bell": "<path d=\"M10.268 21a2 2 0 0 0 3.464 0\" /> <path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\" />",
     "menu": "<line x1=\"4\" x2=\"20\" y1=\"12\" y2=\"12\" /> <line x1=\"4\" x2=\"20\" y1=\"6\" y2=\"6\" /> <line x1=\"4\" x2=\"20\" y1=\"18\" y2=\"18\" />",
@@ -409,20 +412,21 @@
     // --- yuqori qator: logotip + qidiruv / bildirishnoma / menyu ---
     const dot = h('i', { class: 'hm-dot', hidden: true });
     const bell = h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.liveFeed'), onclick: () => openFeed() }, lic('bell', 20), dot);
-    wrap.append(h('div', { class: 'hm-top' }, h('span', { class: 'hm-brand' }, t('o.hmBrand')),
+    const hero = h('div', { class: 'hm-hero' });
+    hero.append(h('div', { class: 'hm-top' },
+      h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.moreTitle'), onclick: () => { haptic('impact', 'light'); go('more'); } }, lic('menu', 20)),
       h('div', { class: 'hm-icons' },
         h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.search'), onclick: () => { haptic('impact', 'light'); ns.focusSearch = true; go('guests'); } }, lic('search', 20)),
-        bell,
-        h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.moreTitle'), onclick: () => { haptic('impact', 'light'); go('more'); } }, lic('menu', 20)))));
+        bell)), h('div', { class: 'hm-spacer' }));
 
     // --- ismlar + sana ---
-    wrap.append(h('div', { class: 'hm-names' }, h('h1', null, d.groom, ' & ', h('br'), d.bride), h('p', null, formatDate(d.date) + (d.ceremonyTime ? ` · ${d.ceremonyTime}` : ''))));
+    hero.append(h('div', { class: 'hm-names' }, h('div', { class: 'hm-brand' }, t('o.hmBrand')), h('h1', null, d.groom, ' & ', h('br'), d.bride), h('p', null, formatDate(d.date) + (d.ceremonyTime ? ` · ${d.ceremonyTime}` : ''))));
 
     // --- teskari sanoq (har soniya) ---
     const cd = { d: h('b'), h: h('b'), m: h('b'), s: h('b') };
     const cell = (k, label) => h('div', { class: 'hm-cd-c' }, cd[k], h('small', null, label));
     const cdTitle = h('div', { class: 'hm-cd-t' });
-    wrap.append(h('div', { class: 'hm-card hm-cd' }, cdTitle, h('div', { class: 'hm-cd-row' }, cell('d', t('o.cdDays')), h('span', null, ':'), cell('h', t('o.cdHours')), h('span', null, ':'), cell('m', t('o.cdMin')), h('span', null, ':'), cell('s', t('o.cdSec')))));
+    hero.append(h('div', { class: 'hm-card hm-cd' }, cdTitle, h('div', { class: 'hm-cd-row' }, cell('d', t('o.cdDays')), h('span', null, ':'), cell('h', t('o.cdHours')), h('span', null, ':'), cell('m', t('o.cdMin')), h('span', null, ':'), cell('s', t('o.cdSec')))));
     const tick = () => {
       let diff = Math.max(0, target() - Date.now());
       cdTitle.textContent = target() > Date.now() ? t('o.cdTitle') : t('o.passed');
@@ -431,6 +435,9 @@
       const mins = Math.floor(diff / 60000); diff -= mins * 60000;
       cd.d.textContent = pad2(days); cd.h.textContent = pad2(hrs); cd.m.textContent = pad2(mins); cd.s.textContent = pad2(Math.floor(diff / 1000));
     };
+    hero.append(h('button', { type: 'button', class: 'hm-edit', onclick: () => { haptic('impact', 'light'); go('content'); } }, h('span', null, lic('pen-line', 20, 1.8), t('o.hmEdit')), lic('chevron-right', 20, 2)),
+      h('button', { type: 'button', class: 'hm-more', 'aria-label': 'More', onclick: () => wrap.querySelector('.hm-grid').scrollIntoView({ behavior: 'smooth', block: 'center' }) }, lic('chevron-down', 22, 2)));
+    wrap.append(hero);
     tick();
     clearInterval(S.cdTimer); S.cdTimer = setInterval(() => { if (!document.body.contains(wrap)) { clearInterval(S.cdTimer); return; } tick(); }, 1000);
 
