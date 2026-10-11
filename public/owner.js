@@ -314,11 +314,13 @@
   function mainShell() {
     clear(S.root);
     S.root.className = 'view owner-root is-active';
-    headEl = h('header', { class: 'o-head' }, h('div', { class: 'o-head-t' }, h('b', { id: 'o-names' }, `${S.draft.groom} & ${S.draft.bride}`), h('small', null, S.role === 'cohost' ? t('o.roleCohost') : t('o.roleOwner'))), statusEl);
+    const backBtn = h('button', { type: 'button', class: 'o-back', 'aria-label': t('o.back'), onclick: () => { haptic('impact', 'light'); go('home'); } },
+      h('svg', { viewBox: '0 0 24 24', ns: true, class: 'o-ico' }, h('path', { d: 'M15 5l-7 7 7 7', ns: true })));
+    headEl = h('header', { class: 'o-head' }, backBtn, h('div', { class: 'o-head-t' }, h('b', { id: 'o-names' }, `${S.draft.groom} & ${S.draft.bride}`), h('small', null, S.role === 'cohost' ? t('o.roleCohost') : t('o.roleOwner'))), statusEl);
     mainEl = h('main', { class: 'o-main', id: 'o-main' });
     tabbarEl = h('nav', { class: 'o-tabbar' }, TABS.map((tb) => h('button', { type: 'button', class: 'o-tab', dataset: { id: tb.id }, onclick: () => { haptic('impact', 'light'); go(tb.id); } },
       h('svg', { viewBox: '0 0 24 24', ns: true, class: 'o-ico' }, h('path', { d: tb.ico, ns: true })), h('span', { 'data-i18n': tb.k }, t(tb.k)))));
-    S.root.append(headEl, mainEl, tabbarEl);
+    S.root.append(headEl, mainEl);
     setStatus(S.dirty ? 'dirty' : 'saved');
   }
 
@@ -326,7 +328,9 @@
     S.tab = id;
     stopPolling(); clearInterval(S.cdTimer);
     S.root.classList.toggle('home-mode', id === 'home');
-    [...tabbarEl.children].forEach((b) => b.classList.toggle('on', b.dataset.id === id));
+    // Telegram'ning o'z "orqaga" tugmasi ham bosh ekranga qaytaradi
+    if (id !== 'home' && !S.backHome) S.backHome = Core.back.push(() => { S.backHome = null; go('home'); });
+    if (id === 'home' && S.backHome) { Core.back.pop(S.backHome); S.backHome = null; }
     renderTab();
   }
   ns.go = go;
@@ -382,6 +386,7 @@
 
   // Lucide (ISC) — SF Symbols'ga eng yaqin ochiq ikonkalar to'plami
   const LUCIDE = {
+    "settings": "<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>",
     "pen-line": "<path d=\"M12 20h9\" /> <path d=\"M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z\" />",
     "chevron-right": "<path d=\"m9 18 6-6-6-6\" />",
     "chevron-down": "<path d=\"m6 9 6 6 6-6\" />",
@@ -414,13 +419,14 @@
     const bell = h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.liveFeed'), onclick: () => openFeed() }, lic('bell', 20), dot);
     const hero = h('div', { class: 'hm-hero' });
     hero.append(h('div', { class: 'hm-top' },
-      h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.moreTitle'), onclick: () => { haptic('impact', 'light'); go('more'); } }, lic('menu', 20)),
+      h('span', { class: 'hm-logo' }, t('o.hmBrand')),
       h('div', { class: 'hm-icons' },
         h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.search'), onclick: () => { haptic('impact', 'light'); ns.focusSearch = true; go('guests'); } }, lic('search', 20)),
-        bell)), h('div', { class: 'hm-spacer' }));
+        bell,
+        h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.moreTitle'), onclick: () => { haptic('impact', 'light'); go('more'); } }, lic('settings', 20)))), h('div', { class: 'hm-spacer' }));
 
     // --- ismlar + sana ---
-    hero.append(h('div', { class: 'hm-names' }, h('div', { class: 'hm-brand' }, t('o.hmBrand')), h('h1', null, d.groom, ' & ', h('br'), d.bride), h('p', null, formatDate(d.date) + (d.ceremonyTime ? ` · ${d.ceremonyTime}` : ''))));
+    hero.append(h('div', { class: 'hm-names' }, h('h1', null, d.groom, ' & ', h('br'), d.bride), h('p', null, formatDate(d.date) + (d.ceremonyTime ? ` · ${d.ceremonyTime}` : ''))));
 
     // --- teskari sanoq (har soniya) ---
     const cd = { d: h('b'), h: h('b'), m: h('b'), s: h('b') };
@@ -583,7 +589,8 @@
     wrap.append(ui.card(
       link('M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6 6 0 0 1 3.5 5.5', t('o.tabGuests'), 'guests'),
       link('M5 20V10M12 20V4M19 20v-7', t('o.tabStats'), 'stats'),
-      link('M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4', t('o.tabContent'), 'content')));
+      link('M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4', t('o.tabContent'), 'content'),
+      link('M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4-4-8-9-8z', t('o.tabDesign'), 'design')));
 
     // Nashr + maxfiylik
     const pubCard = ui.card(h('h3', { class: 'o-h3' }, t('o.publishing')));
@@ -631,7 +638,7 @@
   ns.start = async ({ root, onExit }) => {
     S.root = root; S.onExit = onExit;
     Core.back.clear();
-    Core.onLang(() => { if (S.draft && S.root.classList.contains('is-active') && tabbarEl && tabbarEl.isConnected) { setStatus(S.status); renderTab(); [...tabbarEl.querySelectorAll('[data-i18n]')].forEach((e) => { e.textContent = t(e.dataset.i18n); }); } });
+    Core.onLang(() => { if (S.draft && S.root.classList.contains('is-active') && mainEl && mainEl.isConnected) { setStatus(S.status); renderTab(); } });
     clear(root); root.append(h('div', { class: 'loader' }, h('i')));
     await loadMe();
     document.body.dataset.invdark = '0';

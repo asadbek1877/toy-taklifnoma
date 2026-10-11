@@ -59,6 +59,7 @@ function cleanContent(input) {
   const music = c.music && typeof c.music === 'object' ? c.music : {};
   const hero = c.hero && typeof c.hero === 'object' ? c.hero : {};
   const intro = c.intro && typeof c.intro === 'object' ? c.intro : {};
+  const gift = c.gift && typeof c.gift === 'object' ? c.gift : {};
 
   const deadline = clip(rsvp.deadline, 10);
   const content = {
@@ -81,6 +82,15 @@ function cleanContent(input) {
     gallery: arr(c.gallery, 12).map(useMedia).filter(Boolean),
     video: { mediaId: useMedia(video.mediaId), inIntro: bool(video.inIntro, false) },
     music: { mediaId: useMedia(music.mediaId), autoplay: bool(music.autoplay, true) },
+    gift: {
+      on: bool(gift.on, false),
+      note: clip(gift.note, 300),
+      cards: arr(gift.cards, 3).map((x) => ({
+        number: String((x && x.number) || '').replace(/\D/g, '').slice(0, 19),
+        holder: clip(x && x.holder, 60),
+        bank: clip(x && x.bank, 30),
+      })).filter((x) => /^\d{16,19}$/.test(x.number)),
+    },
     rsvp: {
       deadline: /^\d{4}-\d{2}-\d{2}$/.test(deadline) ? deadline : '',
       maxParty: Math.min(Math.max(parseInt(rsvp.maxParty, 10) || 5, 1), 20),

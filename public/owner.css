@@ -263,3 +263,24 @@
 .o-screen > :nth-child(3), .hm-hero > :nth-child(3) { --n: 2; } .o-screen > :nth-child(4), .hm-hero > :nth-child(4) { --n: 3; }
 .o-screen > :nth-child(5), .hm-hero > :nth-child(5) { --n: 4; } .o-screen > :nth-child(6) { --n: 5; } .o-screen > :nth-child(n+7) { --n: 6; }
 @media (prefers-reduced-motion: reduce) { .o-screen > *, .hm-hero > * { animation: none; } }
+
+/* ===== v4: pastki panel yo'q, "orqaga" tugmasi, o'qiladigan bosh ekran ===== */
+.o-tabbar { display: none !important; }
+.o-main { padding-bottom: calc(var(--sa-bottom) + 28px); }
+.owner-root.home-mode .o-main { padding-bottom: calc(var(--sa-bottom) + 28px); }
+.o-fab { bottom: calc(var(--sa-bottom) + 22px); }
+.o-head { justify-content: flex-start; }
+.o-head .o-head-t { flex: 1; }
+.o-back { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #4a3528; border: 1px solid rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.62); box-shadow: 0 4px 14px rgba(110, 80, 50, 0.14), inset 0 1px 0 #fff; transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
+.o-back:active { transform: scale(0.9); }
+.o-back .o-ico { width: 22px; height: 22px; stroke-width: 2.2; }
+.hm-logo { font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 26px; color: #fff; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.55); }
+/* bosh ekran: sifatli foto + kuchliroq qorong'i qatlam — yozuv aniq o'qiladi */
+.owner-root.home-mode { background: #2a1d14 url('owner-hero.jpg') center 30% / cover no-repeat; }
+.owner-root.home-mode::before { background: linear-gradient(180deg, rgba(18, 11, 6, 0.62) 0%, rgba(18, 11, 6, 0.3) 26%, rgba(18, 11, 6, 0.5) 52%, rgba(18, 11, 6, 0.86) 100%); }
+.hm-names h1 { text-shadow: 0 2px 22px rgba(0, 0, 0, 0.65), 0 1px 3px rgba(0, 0, 0, 0.5); }
+.hm-names p { text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7); }
+.hm-card { background: linear-gradient(180deg, rgba(28, 18, 10, 0.5), rgba(28, 18, 10, 0.36)); border-color: rgba(255, 255, 255, 0.22); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); }
+.hm-cd-t, .hm-cd-c small, .hm-tile-t span { color: rgba(255, 255, 255, 0.9); }
+.hm-ib { background: rgba(28, 18, 10, 0.38); border-color: rgba(255, 255, 255, 0.3); }
+.hm-link { color: #fff; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }

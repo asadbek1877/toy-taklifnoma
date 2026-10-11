@@ -6,7 +6,7 @@
   const D = () => S.draft;
   const rid = () => Math.random().toString(36).slice(2, 8);
 
-  const SUBS = ['basics', 'story', 'schedule', 'location', 'dress', 'menu', 'extra', 'media', 'rsvp', 'sections'];
+  const SUBS = ['basics', 'story', 'schedule', 'location', 'dress', 'menu', 'extra', 'media', 'rsvp', 'gift', 'sections'];
   let sub = 'basics';
 
   const move = (arr, i, dir) => { const j = i + dir; if (j < 0 || j >= arr.length) return false; [arr[i], arr[j]] = [arr[j], arr[i]]; return true; };
@@ -196,6 +196,31 @@
       const dl = h('input', { class: 'o-input', type: 'date', value: r.deadline || '', oninput: (e) => { r.deadline = e.target.value || ''; ns.touch(); } });
       return h('div', { class: 'o-col' }, ui.card(ui.field(t('o.deadline'), dl, t('o.deadlineHint')), ui.btn(t('o.clearDeadline'), () => { r.deadline = ''; dl.value = ''; ns.touch(); }, 'ghost small'),
         ui.field(t('o.maxParty'), ms, t('o.maxPartyHint')), ui.toggle(t('o.askComment'), () => r.askComment, (v) => { r.askComment = v; ns.touch(); })));
+    },
+
+    gift() {
+      const c = D().content;
+      if (!c.gift) c.gift = { on: false, note: '', cards: [] };
+      const g = c.gift, box = h('div', { class: 'o-col' });
+      const fmt = (v) => v.replace(/\D/g, '').slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 ');
+      const draw = () => {
+        clear(box);
+        box.append(ui.card(ui.toggle(t('o.giftOn'), () => g.on, (v) => { g.on = v; if (v && !g.cards.length) g.cards.push({ number: '', holder: '', bank: '' }); ns.touch(); draw(); }, t('o.giftOnD'))));
+        if (!g.on) return;
+        g.cards.forEach((x, i) => {
+          const num = h('input', { class: 'o-input', inputmode: 'numeric', autocomplete: 'off', placeholder: '8600 0000 0000 0000', value: fmt(x.number || ''), maxlength: 23,
+            oninput: (e) => { const f = fmt(e.target.value); e.target.value = f; x.number = f.replace(/\s/g, ''); ns.touch(); } });
+          const holder = h('input', { class: 'o-input', maxlength: 60, placeholder: t('o.giftHolderPh'), value: x.holder || '', oninput: (e) => { x.holder = e.target.value; ns.touch(); } });
+          const bank = h('input', { class: 'o-input', maxlength: 30, placeholder: 'Uzcard / Humo / Visa', value: x.bank || '', oninput: (e) => { x.bank = e.target.value; ns.touch(); } });
+          box.append(ui.card(h('div', { class: 'o-row-between' }, h('b', null, t('o.giftCard') + ' ' + (i + 1)), ui.btn('✕', () => { g.cards.splice(i, 1); ns.touch(); draw(); }, 'ghost small icon danger')),
+            ui.field(t('o.giftNumber'), num), ui.field(t('o.giftHolder'), holder), ui.field(t('o.giftBank'), bank)));
+        });
+        if (g.cards.length < 3) box.append(ui.btn('➕ ' + t('o.giftAdd'), () => { g.cards.push({ number: '', holder: '', bank: '' }); ns.touch(); draw(); }, 'ghost'));
+        const note = h('textarea', { class: 'o-input', rows: 3, maxlength: 300, placeholder: t('o.giftNotePh'), oninput: (e) => { g.note = e.target.value; ns.touch(); } });
+        note.value = g.note || '';
+        box.append(ui.card(ui.field(t('o.giftNote'), note, t('o.giftHint'))));
+      };
+      draw(); return box;
     },
 
     sections() {

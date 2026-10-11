@@ -1,7 +1,7 @@
 /* i18n.js — mehmon va umumiy ekranlar matnlari (uz / ru / ja). Egasi interfeysi matnlari — i18n-owner.js (faqat egasiga yuklanadi). */
 window.I18N = {
   uz: {
-    'app.title': 'Taklifnoma', 'brand': 'To`yga keling', 'gate.lang': 'Tilni tanlang', 'gate.music': 'Musiqa bilanmi?', 'gate.on': 'Musiqa bilan', 'gate.off': 'Musiqasiz', 'wel.l1': 'Ikki yurak,', 'wel.l2': 'bitta orzu', 'wel.l3': "Eng go'zal kuningizga munosib taklifnoma yarating — mehmonlar uni uzoq eslashadi", 'wel.go': 'Boshlash',
+    'app.title': 'Taklifnoma', 'brand': 'To`yga keling', 'sec.gift': "To'yona", 'gift.note': "Tabriklaringiz uchun rahmat! To'yona qoldirmoqchi bo'lsangiz — kartani bosing, raqam nusxalanadi.", 'gift.copy': 'Nusxalash', 'gift.copied': 'Karta raqami nusxalandi ✓', 'gift.copiedOpen': "Raqam nusxalandi — ilovada «O'tkazma» bo'limiga qo'ying", 'gift.via': 'Ilova orqali yuborish', 'gate.lang': 'Tilni tanlang', 'gate.music': 'Musiqa bilanmi?', 'gate.on': 'Musiqa bilan', 'gate.off': 'Musiqasiz', 'wel.l1': 'Ikki yurak,', 'wel.l2': 'bitta orzu', 'wel.l3': "Eng go'zal kuningizga munosib taklifnoma yarating — mehmonlar uni uzoq eslashadi", 'wel.go': 'Boshlash',
     'role.title': "To'y egasimisiz yoki mehmon?", 'role.owner': "Men to'y egasiman", 'role.ownerDesc': 'Taklifnoma yarating va mehmonlarga yuboring',
     'role.guest': 'Men mehmonman', 'role.guestDesc': 'Taklifnoma havolasi orqali oching',
     'role.hint.title': 'Havola kerak', 'role.hint.text': "Taklifnomani ko'rish uchun to'y egasi yuborgan shaxsiy havolani oching.",
@@ -24,7 +24,7 @@ window.I18N = {
     'delivery.pending': "⏳ Qurilmangizda saqlandi — aloqa bo'lishi bilan o'zi yuboriladi", 'delivery.sent': "✓ To'y egasiga yetkazildi", 'delivery.rejected': "⚠ Yuborib bo'lmadi. Qayta urinib ko'ring",
   },
   ru: {
-    'app.title': 'Приглашение', 'brand': 'Приходите на той', 'gate.lang': 'Выберите язык', 'gate.music': 'С музыкой?', 'gate.on': 'С музыкой', 'gate.off': 'Без музыки', 'wel.l1': 'Две души,', 'wel.l2': 'одна мечта', 'wel.l3': 'Создайте приглашение, достойное вашего самого красивого дня — гости запомнят его надолго', 'wel.go': 'Начать',
+    'app.title': 'Приглашение', 'brand': 'Приходите на той', 'sec.gift': 'Тоёна', 'gift.note': 'Спасибо за ваши поздравления! Если хотите оставить тоёну — нажмите на карту, номер скопируется.', 'gift.copy': 'Копировать', 'gift.copied': 'Номер карты скопирован ✓', 'gift.copiedOpen': 'Номер скопирован — вставьте его в разделе «Перевод» в приложении', 'gift.via': 'Отправить через приложение', 'gate.lang': 'Выберите язык', 'gate.music': 'С музыкой?', 'gate.on': 'С музыкой', 'gate.off': 'Без музыки', 'wel.l1': 'Две души,', 'wel.l2': 'одна мечта', 'wel.l3': 'Создайте приглашение, достойное вашего самого красивого дня — гости запомнят его надолго', 'wel.go': 'Начать',
     'role.title': 'Вы владелец свадьбы или гость?', 'role.owner': 'Я владелец свадьбы', 'role.ownerDesc': 'Создайте приглашение и отправьте гостям',
     'role.guest': 'Я гость', 'role.guestDesc': 'Откройте по ссылке-приглашению',
     'role.hint.title': 'Нужна ссылка', 'role.hint.text': 'Чтобы увидеть приглашение, откройте персональную ссылку, которую прислал владелец свадьбы.',
@@ -47,7 +47,7 @@ window.I18N = {
     'delivery.pending': '⏳ Сохранено на устройстве — отправится само, как только появится связь', 'delivery.sent': '✓ Доставлено владельцу', 'delivery.rejected': '⚠ Не удалось отправить. Попробуйте ещё раз',
   },
   ja: {
-    'app.title': '招待状', 'brand': '結婚式へようこそ', 'gate.lang': '言語を選択', 'gate.music': '音楽をつけますか？', 'gate.on': '音楽あり', 'gate.off': '音楽なし', 'wel.l1': '二つの心、', 'wel.l2': 'ひとつの夢', 'wel.l3': '最も美しい日にふさわしい招待状を作りましょう', 'wel.go': '始める',
+    'app.title': '招待状', 'brand': '結婚式へようこそ', 'sec.gift': 'ご祝儀', 'gift.note': 'お祝いの気持ちをありがとうございます。カードをタップすると番号がコピーされます。', 'gift.copy': 'コピー', 'gift.copied': 'カード番号をコピーしました ✓', 'gift.copiedOpen': '番号をコピーしました。アプリの送金画面に貼り付けてください', 'gift.via': 'アプリで送る', 'gate.lang': '言語を選択', 'gate.music': '音楽をつけますか？', 'gate.on': '音楽あり', 'gate.off': '音楽なし', 'wel.l1': '二つの心、', 'wel.l2': 'ひとつの夢', 'wel.l3': '最も美しい日にふさわしい招待状を作りましょう', 'wel.go': '始める',
     'role.title': '新郎新婦ですか？ゲストですか？', 'role.owner': '新郎新婦です', 'role.ownerDesc': '招待状を作成してゲストに送る',
     'role.guest': 'ゲストです', 'role.guestDesc': '招待リンクから開く',
     'role.hint.title': 'リンクが必要です', 'role.hint.text': '招待状を見るには、新郎新婦から届いた専用リンクを開いてください。',

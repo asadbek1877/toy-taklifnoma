@@ -222,7 +222,48 @@
       rs.deadline && h('p', { class: 'deadline' }, t('rsvp.deadline', { date: formatDate(rs.deadline) })),
       closedLocal ? h('p', { class: 'closed' }, t('rsvp.closed')) : [form, okCard]);
     scroll.append(rsvpSec);
+    const giftSec = giftSection();
+    if (giftSec) scroll.append(giftSec);
     scroll.append(h('footer', { class: 'inv-foot' }, h('div', { class: 'orn-wrap' }, ornament(tpl.ornament)), h('p', { class: 'foot-names' }, `${inv.groom} & ${inv.bride}`), h('p', { class: 'foot-date' }, formatDate(inv.date)), h('p', { class: 'foot-thanks' }, t('inv.footer'))));
+
+    // To'yona: karta raqami + bir bosishda nusxa + bank ilovalari
+    function giftSection() {
+      const g = c.gift;
+      if (!g || !g.on || !g.cards || !g.cards.length) return null;
+      const fmt = (n) => n.replace(/(\d{4})(?=\d)/g, '$1 ');
+      const brand = (n) => (n.startsWith('8600') || n.startsWith('5614') ? 'UZCARD' : n.startsWith('9860') ? 'HUMO' : n.startsWith('4') ? 'VISA' : n.startsWith('5') ? 'MASTERCARD' : '');
+      const copy = async (text) => {
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) {
+          try { const ta = h('textarea', { style: { position: 'fixed', opacity: '0' } }); ta.value = text; document.body.append(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e2) { return false; }
+        }
+      };
+      const hint = h('p', { class: 'gift-hint', role: 'status' });
+      let chosen = g.cards[0].number;
+      const say = (k) => { hint.textContent = t(k); hint.classList.remove('flash'); void hint.offsetWidth; hint.classList.add('flash'); };
+      const cards = g.cards.map((x) => {
+        const cardEl = h('button', { type: 'button', class: 'gift-card', onclick: async () => { chosen = x.number; haptic('notify', 'success'); if (await copy(x.number)) say('gift.copied'); } },
+          h('div', { class: 'gift-card-top' }, h('span', { class: 'gift-chip' }), h('span', { class: 'gift-brand' }, x.bank || brand(x.number))),
+          h('div', { class: 'gift-num' }, fmt(x.number)),
+          h('div', { class: 'gift-card-bot' }, h('span', null, x.holder || `${inv.groom} & ${inv.bride}`), h('span', { class: 'gift-copy' }, t('gift.copy'))));
+        return cardEl;
+      });
+      const APPS = [
+        { id: 'click', name: 'Click', url: 'https://my.click.uz/' },
+        { id: 'payme', name: 'Payme', url: 'https://payme.uz/' },
+        { id: 'uzum', name: 'Uzum Bank', url: 'https://uzumbank.uz/' },
+      ];
+      const openApp = async (a) => {
+        haptic('impact', 'medium');
+        await copy(chosen); say('gift.copiedOpen');
+        setTimeout(() => { const tgw = window.Telegram && window.Telegram.WebApp; if (tgw && tgw.openLink) tgw.openLink(a.url); else window.open(a.url, '_blank', 'noopener'); }, 450);
+      };
+      return h('section', { class: 'sec gift rv', id: 'gift' }, h('h2', { class: 'sec-title' }, t('sec.gift')), h('div', { class: 'orn-wrap' }, ornament(tpl.ornament)),
+        h('p', { class: 'gift-note' }, g.note || t('gift.note')),
+        h('div', { class: 'gift-cards' }, cards),
+        h('p', { class: 'gift-label' }, t('gift.via')),
+        h('div', { class: 'gift-apps' }, APPS.map((a) => h('button', { type: 'button', class: 'gift-app gift-' + a.id, onclick: () => openApp(a) }, h('i'), h('span', null, a.name)))),
+        hint);
+    }
 
     // Qurilmada yuborilmay qolgan javob bo'lsa — qayta ko'rsatamiz
     if (!opts.preview) {
@@ -284,13 +325,22 @@
     else openApp(false);
 
     function envelopeIntro() {
-      const seal = h('button', { class: 'seal', type: 'button', 'aria-label': t('inv.tapOpen') }, h('span', null, initials(inv)));
-      const wrap = h('div', { class: 'env' }, h('div', { class: 'env-back' }), h('div', { class: 'env-letter' }, h('p', null, t('inv.eyebrow')), h('b', null, `${inv.groom} & ${inv.bride}`)), h('div', { class: 'env-body' }), h('div', { class: 'env-flap' }), seal);
-      const ov = h('div', { class: 'intro intro-env' }, photoUrl && h('div', { class: 'intro-photo', style: { backgroundImage: `url(${abs(photoUrl)})` } }), h('div', { class: 'intro-inner' }, wrap, h('p', { class: 'intro-hint' }, t('inv.tapOpen'))));
+      // Haqiqiy konvert: qog'oz tekstura, 3D qopqoq, sinadigan mum muhr, chiqib keladigan xat
+      const seal = h('button', { class: 'seal', type: 'button', 'aria-label': t('inv.tapOpen') }, h('i', { class: 'seal-half l' }), h('i', { class: 'seal-half r' }), h('span', null, initials(inv)));
+      const flap = h('div', { class: 'env-flap' }, h('i', { class: 'flap-front' }), h('i', { class: 'flap-back' }));
+      const letter = h('div', { class: 'env-letter' }, h('p', null, inv.guest ? t('inv.dear', { name: inv.guest.name }) : t('inv.eyebrow')), h('b', null, inv.groom), h('em', null, '&'), h('b', null, inv.bride), h('small', null, formatDate(inv.date)));
+      const wrap = h('div', { class: 'env' }, h('div', { class: 'env-back' }), letter, h('div', { class: 'env-body' }), flap, seal);
+      const sparks = Array.from({ length: 10 }, (_, i) => h('i', { class: 'env-spark', style: { left: `${8 + ((i * 37) % 84)}%`, top: `${10 + ((i * 53) % 78)}%`, animationDelay: `${(i * 0.37) % 3}s` } }));
+      const ov = h('div', { class: 'intro intro-env' }, photoUrl && h('div', { class: 'intro-photo', style: { backgroundImage: `url(${abs(photoUrl)})` } }), h('div', { class: 'env-glow' }), ...sparks,
+        h('div', { class: 'intro-inner' }, wrap, h('p', { class: 'intro-hint' }, t('inv.tapOpen'))));
       let done = false;
       const go = () => {
-        if (done) return; done = true; haptic('impact', 'medium'); wrap.classList.add('opening'); rustle();
-        setTimeout(() => { ov.classList.add('gone'); openApp(true); setTimeout(() => ov.remove(), 900); }, 1000);
+        if (done) return; done = true; haptic('impact', 'medium'); rustle();
+        const fast = reduce ? 0.2 : 1;
+        wrap.classList.add('opening');                                   // muhr sinadi, qopqoq ochiladi
+        setTimeout(() => wrap.classList.add('lift'), 850 * fast);        // xat chiqadi
+        setTimeout(() => { wrap.classList.add('zoom'); ov.classList.add('reveal'); haptic('impact', 'light'); }, 1900 * fast); // xat yaqinlashadi
+        setTimeout(() => { ov.classList.add('gone'); openApp(true); setTimeout(() => ov.remove(), 1000); }, 2600 * fast);
       };
       ov.addEventListener('click', go); // butun ekran bosiladi (faqat konvertga tegish shart emas)
       return ov;
