@@ -340,3 +340,9 @@
 
 .hm-names { border: 0; background: none; padding: 6px 2px 2px; text-align: left; color: inherit; width: 100%; cursor: pointer; transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
 .hm-names:active { transform: scale(0.985); }
+
+.o-gifts { display: flex; flex-direction: column; gap: 4px; }
+.o-gift-total { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0 10px; border-bottom: 1px solid rgba(110, 80, 50, 0.12); }
+.o-gift-total b { font-family: 'Playfair Display', Georgia, serif; font-size: 26px; font-weight: 500; color: #2e1f19; }
+.o-gift-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(110, 80, 50, 0.08); }
+.o-gift-row small { display: block; color: var(--soft); font-size: 12px; } .o-gift-row span { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }

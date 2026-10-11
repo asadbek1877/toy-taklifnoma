@@ -266,6 +266,14 @@
         clear(box);
         box.append(ui.card(ui.toggle(t('o.giftOn'), () => g.on, (v) => { g.on = v; if (v && !g.cards.length) g.cards.push({ number: '', holder: '', bank: '' }); ns.touch(); draw(); }, t('o.giftOnD'))));
         if (!g.on) return;
+        const list = h('div', { class: 'o-gifts' }, ui.spinner());
+        box.append(ui.card(h('h3', { class: 'o-h3' }, '🎁 ' + t('o.giftsGot')), list));
+        api('/api/owner/gifts', {}).then((r) => {
+          clear(list);
+          list.append(h('div', { class: 'o-gift-total' }, h('small', null, t('o.giftsTotal')), h('b', null, r.total.toLocaleString('ru-RU').replace(/,/g, ' ') + ' ' + t('o.sum'))));
+          if (!r.gifts.length) list.append(h('p', { class: 'o-hint' }, t('o.giftsNone')));
+          r.gifts.forEach((x) => list.append(h('div', { class: 'o-gift-row' }, h('div', null, h('b', null, x.name || '—'), h('small', null, ns.fmtStamp(x.at) + (x.comment ? ' · ' + x.comment : ''))), h('span', null, x.amount.toLocaleString('ru-RU').replace(/,/g, ' ')))));
+        }).catch(() => { clear(list); list.append(h('p', { class: 'o-hint' }, t('o.network'))); });
         g.cards.forEach((x, i) => {
           const num = h('input', { class: 'o-input', inputmode: 'numeric', autocomplete: 'off', placeholder: '8600 0000 0000 0000', value: fmt(x.number || ''), maxlength: 23,
             oninput: (e) => { const f = fmt(e.target.value); e.target.value = f; x.number = f.replace(/\s/g, ''); ns.touch(); } });

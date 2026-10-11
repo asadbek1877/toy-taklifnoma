@@ -94,4 +94,34 @@ router.post('/view', wrap(async (req, res) => {
   res.status(204).end();
 }));
 
+// POST /api/invite/gift { code | token, amount, comment } — mehmon o'zi tasdiqlaydi (bank webhook yo'q)
+const giftHits = new Map(); // tg_id -> oxirgi vaqt (spamdan himoya)
+router.post('/gift', wrap(async (req, res) => {
+  const user = userOf(req);
+  if (!user) return res.status(401).json({ error: 'auth' });
+  const { code, token } = req.body || {};
+  const amount = Math.round(Number(String(req.body.amount || '').replace(/[^\d]/g, '')));
+  if (!Number.isFinite(amount) || amount < 1000 || amount > 1e10) return res.status(400).json({ error: 'amount' });
+  const last = giftHits.get(user.id) || 0;
+  if (Date.now() - last < 20000) return res.status(429).json({ error: 'slow' });
+  giftHits.set(user.id, Date.now());
+
+  let w = null, guest = null;
+  if (typeof token === 'string') { guest = await store.getGuestByToken(token); w = guest && (await store.getWeddingRow(guest.wedding_id)); }
+  else if (typeof code === 'string') { w = await store.getWeddingByCodeRow(code); if (w && w.visibility === 'private') w = null; }
+  if (!w || !w.published) return res.status(404).json({ error: 'not_found' });
+
+  const name = (guest ? guest.name : [user.first_name, user.last_name].filter(Boolean).join(' ')) || 'Mehmon';
+  const comment = String(req.body.comment || '').trim().slice(0, 300);
+  await store.logEvent({ weddingId: w.id, guestId: guest ? guest.id : null, type: 'gift', tgId: user.id, meta: { name, username: user.username || null, amount, comment } });
+  const { esc } = require('../messages');
+  const sum = amount.toLocaleString('ru-RU').replace(/,/g, ' ');
+  const who = user.username ? ` (@${esc(user.username)})` : '';
+  await notify.toMembers(w, {
+    type: 'gift', dedupeBase: `gift:${w.id}:${user.id}:${Date.now()}`,
+    text: `🎉 <b>Янги тўёна!</b>\n\n👤 Кимдан: <b>${esc(name)}</b>${who}\n💰 Сумма: <b>${sum} сўм</b>${comment ? `\n💬 «${esc(comment)}»` : ''}\n✅ Ҳолат: меҳмон тасдиқлади`,
+  });
+  res.json({ ok: true });
+}));
+
 module.exports = { router, buildInvite };

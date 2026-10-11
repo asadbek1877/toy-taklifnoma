@@ -430,6 +430,7 @@
     if (e.type === 'open') return { ico: '👀', txt: t('o.evOpen', { name: who }) };
     if (e.type === 'link_start') return { ico: '🔗', txt: t('o.evStart', { name: who }) };
     if (e.type === 'cohost') return { ico: '💑', txt: t('o.evCohost', { name: who }) };
+    if (e.type === 'gift') return { ico: '🎁', txt: t('o.evGift', { name: who, sum: Number(m.amount || 0).toLocaleString('ru-RU').replace(/,/g, ' ') }) };
     return { ico: '•', txt: e.type };
   };
   const pad2 = (n) => String(n).padStart(2, '0');

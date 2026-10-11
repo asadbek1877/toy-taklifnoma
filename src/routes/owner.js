@@ -242,6 +242,15 @@ router.post('/analytics', wrap(async (req, res) => {
   res.json(await store.analytics(m.wedding.id, Math.min(Math.max(parseInt(req.body.days, 10) || 14, 7), 60)));
 }));
 
+// Kelgan to'yonalar ro'yxati (mehmon tasdiqlagan)
+router.post('/gifts', wrap(async (req, res) => {
+  const m = await requireMember(req, res);
+  if (!m) return;
+  const r = await require('../db').pool.query("SELECT id, meta, created_at FROM events WHERE wedding_id = $1 AND type = 'gift' ORDER BY id DESC LIMIT 500", [m.wedding.id]);
+  const gifts = r.rows.map((x) => { let meta = {}; try { meta = JSON.parse(x.meta || '{}'); } catch (e) { /* */ } return { id: Number(x.id), name: meta.name || '', username: meta.username || null, amount: Number(meta.amount) || 0, comment: meta.comment || '', at: x.created_at }; });
+  res.json({ gifts, total: gifts.reduce((a, g) => a + g.amount, 0) });
+}));
+
 router.post('/resolve-map', wrap(async (req, res) => {
   const m = await requireMember(req, res);
   if (!m) return;

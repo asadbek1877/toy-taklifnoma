@@ -249,6 +249,7 @@
         { id: 'click', name: 'Click', url: 'https://my.click.uz/' },
         { id: 'payme', name: 'Payme', url: 'https://payme.uz/' },
         { id: 'uzum', name: 'Uzum Bank', url: 'https://uzumbank.uz/' },
+        { id: 'tbc', name: 'TBC Bank', url: 'https://tbcbank.uz/' },
       ];
       const direct = (g.links || {});
       const openApp = async (a) => {
@@ -262,7 +263,31 @@
         h('div', { class: 'gift-cards' }, cards),
         h('p', { class: 'gift-label' }, t('gift.via')),
         h('div', { class: 'gift-apps' }, APPS.map((a) => h('button', { type: 'button', class: 'gift-app gift-' + a.id, onclick: () => openApp(a) }, h('i'), h('span', null, a.name)))),
-        hint);
+        hint, sentBlock());
+    }
+
+    // O'tkazmadan keyin: summani kiritib tasdiqlash -> egalariga darhol xabar
+    function sentBlock() {
+      const amt = h('input', { class: 'gift-amt', inputmode: 'numeric', placeholder: t('gift.amountPh'), autocomplete: 'off',
+        oninput: (e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 11); e.target.value = d ? Number(d).toLocaleString('ru-RU').replace(/,/g, ' ') : ''; } });
+      const note = h('input', { class: 'gift-amt gift-note-in', maxlength: 300, placeholder: t('gift.commentPh') });
+      const msg = h('p', { class: 'gift-msg', role: 'status' });
+      const send = h('button', { type: 'button', class: 'btn primary' }, t('gift.confirm'));
+      const form = h('div', { class: 'gift-form', hidden: true }, h('label', null, t('gift.amount')), amt, note, send, msg);
+      const open = h('button', { type: 'button', class: 'btn ghost gift-sent-btn', onclick: () => { haptic('impact', 'medium'); open.hidden = true; form.hidden = false; setTimeout(() => amt.focus(), 80); } }, '✅ ' + t('gift.sent'));
+      const done = h('div', { class: 'gift-done', hidden: true }, h('div', { class: 'ok-ico' }, '💛'), h('p', null, t('gift.thanks')));
+      send.onclick = async () => {
+        if (opts.preview) { msg.textContent = t('rsvp.preview'); return; }
+        const amount = Number(amt.value.replace(/\D/g, ''));
+        if (!amount || amount < 1000) { msg.textContent = t('gift.errAmount'); haptic('notify', 'error'); return; }
+        send.disabled = true; msg.textContent = '';
+        try {
+          await Core.api('/api/invite/gift', { amount, comment: note.value.trim(), ...(opts.guestToken ? { token: opts.guestToken } : { code: inv.code }) });
+          haptic('notify', 'success'); form.hidden = true; done.hidden = false; confetti(root, { y: 0.7 });
+        } catch (e) { msg.textContent = t(e && e.status === 429 ? 'gift.errSlow' : 'gift.errSend'); haptic('notify', 'error'); }
+        finally { send.disabled = false; }
+      };
+      return h('div', { class: 'gift-sent' }, open, form, done);
     }
 
     // Qurilmada yuborilmay qolgan javob bo'lsa — qayta ko'rsatamiz
