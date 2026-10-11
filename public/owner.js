@@ -610,7 +610,7 @@
     wrap.append(coh);
 
     // Til + xotira + chiqish
-    const langRow = ui.chips(Core.LANGS.map((l) => ({ id: l, label: l.toUpperCase() })), () => Core.getLang(), (l) => { Core.setLang(l, true); });
+    const langRow = ui.chips(Core.LANGS.filter((l) => l !== 'ja').map((l) => ({ id: l, label: l.toUpperCase() })), () => Core.getLang(), (l) => { Core.setLang(l, true); });
     const pct = S.media.quota ? Math.min(100, Math.round((S.media.usage / S.media.quota) * 100)) : 0;
     wrap.append(ui.card(h('h3', { class: 'o-h3' }, '🌐 ' + t('o.language')), langRow, h('div', { class: 'o-sep' }), h('h3', { class: 'o-h3' }, '💾 ' + t('o.storage')),
       h('div', { class: 'o-prog' }, h('i', { style: { width: pct + '%' } })), h('small', { class: 'o-hint' }, `${(S.media.usage / 1048576).toFixed(1)} / ${(S.media.quota / 1048576).toFixed(0)} MB`)));

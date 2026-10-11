@@ -105,3 +105,24 @@ body.bg-blur #bg i { background: rgba(255, 244, 240, 0.2); }
 @keyframes toastIn { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+/* ===== kirish ekrani (til + musiqa) va salomlashuv yozuvi ===== */
+#v-gate { background: transparent; }
+.gate-wrap { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.gate-brand { font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 34px; color: #7a5326; text-shadow: 0 1px 12px rgba(255, 255, 255, 0.8); margin-bottom: 14px; }
+.gate-sub { font-size: 14px; font-weight: 600; letter-spacing: 0.04em; color: #4a3236; text-shadow: 0 1px 10px rgba(255, 255, 255, 0.7); margin-top: 6px; }
+.gate-langs { display: flex; gap: 6px; padding: 5px; border-radius: 999px; width: 100%; background: rgba(255, 255, 255, 0.42); border: 1px solid rgba(255, 255, 255, 0.75); -webkit-backdrop-filter: blur(16px) saturate(1.5); backdrop-filter: blur(16px) saturate(1.5); box-shadow: 0 8px 24px rgba(110, 60, 70, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+.gate-langs button { flex: 1; border: 0; background: transparent; padding: 14px 8px; border-radius: 999px; font-size: 16px; font-weight: 650; color: #5a4548; transition: all 0.3s var(--ease); }
+.gate-langs button.on { background: linear-gradient(180deg, #cfa869, #a77a3d 60%, #8a6128); color: #fff; box-shadow: 0 8px 18px rgba(138, 97, 40, 0.35); }
+.gate-music { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+.gate-card { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px 10px; border-radius: 26px; font-size: 15px; font-weight: 650; color: #2b1d20; border: 1px solid rgba(255, 255, 255, 0.75); background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 252, 250, 0.6)); -webkit-backdrop-filter: blur(16px) saturate(1.5); backdrop-filter: blur(16px) saturate(1.5); box-shadow: 0 10px 28px rgba(110, 60, 70, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.95); transition: transform 0.2s; }
+.gate-card svg { color: #a8742a; }
+.gate-card:active { transform: scale(0.97); }
+.wel-scrim { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(30, 18, 10, 0) 38%, rgba(30, 18, 10, 0.62) 100%); }
+.wel-text { position: absolute; left: 0; right: 0; bottom: calc(var(--sa-bottom) + 52px); padding: 0 28px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; color: #fff; }
+.wel-text p { font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; font-size: 36px; line-height: 1.12; font-weight: 500; text-shadow: 0 2px 20px rgba(0, 0, 0, 0.4); opacity: 0; filter: blur(14px); transform: translateY(14px); }
+.wel-text p.wel-sub { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; font-size: 15px; line-height: 1.4; margin-top: 10px; color: rgba(255, 255, 255, 0.88); }
+.wel-go { margin-top: 22px; display: inline-flex; align-items: center; gap: 10px; padding: 15px 26px; border-radius: 999px; font-size: 16px; font-weight: 650; color: #fff; border: 1px solid rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.18); -webkit-backdrop-filter: blur(16px) saturate(1.5); backdrop-filter: blur(16px) saturate(1.5); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.5); opacity: 0; filter: blur(10px); transform: translateY(10px); }
+#v-welcome.play .wel-text p, #v-welcome.play .wel-go { animation: welIn 1.3s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(0.5s + var(--i) * 0.75s); }
+@keyframes welIn { to { opacity: 1; filter: blur(0); transform: none; } }
+@media (prefers-reduced-motion: reduce) { #v-welcome.play .wel-text p, #v-welcome.play .wel-go { animation-duration: 0.01s; animation-delay: 0s; } }

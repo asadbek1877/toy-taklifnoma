@@ -5,13 +5,13 @@
      havolasiz              -> "to'y egasimisiz yoki mehmon?"                                   */
 (function () {
   const { t, $, h, api, haptic, safe } = Core;
-  const VIEWS = ['loading', 'message', 'welcome', 'role', 'cohost', 'invite', 'owner'];
+  const VIEWS = ['loading', 'message', 'gate', 'welcome', 'role', 'cohost', 'invite', 'owner'];
   let invite = null; // joriy taklifnoma (til o'zgarsa qayta chizish uchun)
 
   function show(name) {
     VIEWS.forEach((v) => $('v-' + v).classList.toggle('is-active', v === name));
-    document.body.classList.toggle('hide-lang', name === 'owner' || name === 'welcome');
-    const bgOn = name === 'welcome' || name === 'role' || name === 'message' || name === 'cohost';
+    document.body.classList.toggle('hide-lang', name === 'owner' || name === 'welcome' || name === 'gate');
+    const bgOn = name === 'gate' || name === 'welcome' || name === 'role' || name === 'message' || name === 'cohost';
     document.body.classList.toggle('has-bg', bgOn);
     document.body.classList.toggle('bg-blur', name !== 'welcome');
     const bv = $('welcome-video');
@@ -91,20 +91,45 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) music.pause(); else kick(); });
 
   // ---------- SALOMLASHUV (video) ----------
+  // ---------- KIRISH: til + musiqa, keyin video va yozuv ----------
+  const GATE_KEY = 'toy_gate';
+  const gateDone = () => { try { return localStorage.getItem(GATE_KEY) === '1'; } catch (e) { return false; } };
+  const paintGate = () => document.querySelectorAll('#gate-langs button').forEach((b) => b.classList.toggle('on', b.dataset.lang === Core.getLang()));
+  function showGate() {
+    if (!['uz', 'ru'].includes(Core.getLang())) Core.setLang('uz', false);
+    show('gate'); paintGate();
+    Core.setChrome('#efe2d3');
+    Core.back.clear();
+  }
+  document.querySelectorAll('#gate-langs button').forEach((b) => b.addEventListener('click', () => { haptic('impact', 'light'); Core.setLang(b.dataset.lang, true); paintGate(); }));
+  Core.onLang(paintGate);
+  function gateChoose(withMusic) {
+    haptic('impact', 'medium');
+    musicWanted = withMusic;
+    try { localStorage.setItem('toy_music', withMusic ? 'on' : 'off'); localStorage.setItem(GATE_KEY, '1'); localStorage.setItem('toy_lang_set', Core.getLang()); } catch (e) { /* ixtiyoriy */ }
+    showWelcome(); // musicSync show() ichida: tanlov bosilgan paytda o'ynay boshlaydi
+  }
+  $('gate-on').addEventListener('click', () => gateChoose(true));
+  $('gate-off').addEventListener('click', () => gateChoose(false));
+
   function showWelcome() {
-    $('v-welcome').classList.remove('out');
+    const w = $('v-welcome');
+    w.classList.remove('out', 'play'); void w.offsetWidth; // animatsiyani qayta boshlash
     show('welcome');
+    w.classList.add('play');
     Core.setChrome('#f3d9cf');
     Core.back.clear();
   }
-  // X bosilsa: tugma so'nadi, fon asta-sekin xiralashadi, rol ekrani silliq chiqadi
+  // X yoki "Boshlash": fon xiralashadi, so'ng to'g'ridan-to'g'ri mezbon (egasi) bo'limi ochiladi
   let leaving = false;
-  $('welcome-x').addEventListener('click', () => {
+  function leaveWelcome() {
     if (leaving) return; leaving = true; haptic('impact', 'light');
     $('v-welcome').classList.add('out');
     document.body.classList.add('bg-blur');
-    setTimeout(() => { showRole(); leaving = false; }, 380);
-  });
+    setTimeout(() => { leaving = false; startOwner(); }, 450);
+  }
+  $('welcome-x').addEventListener('click', leaveWelcome);
+  $('wel-go').addEventListener('click', leaveWelcome);
 
   // ---------- ROL TANLASH ----------
   function showRole() {
@@ -131,7 +156,7 @@
       })();
       await ownerLoading;
       show('owner');
-      await window.OwnerApp.start({ root: $('v-owner'), onExit: showRole });
+      await window.OwnerApp.start({ root: $('v-owner'), onExit: showWelcome });
     } catch (err) {
       console.error('Owner start xatolik:', err);
       ownerLoading = null;
@@ -165,7 +190,7 @@
     const e = window.__entry || {};
     if (e.kind === 'w' || e.kind === 'g') return openInvite(e.kind, e.key);
     if (e.kind === 'c') return openCohost(e.key);
-    showWelcome();
+    if (gateDone()) showWelcome(); else showGate();
   }
   boot();
   Core.rsvpQueue.flush(); // oldingi sessiyada yuborilmay qolgan javoblar bo'lsa — darhol yuboramiz
