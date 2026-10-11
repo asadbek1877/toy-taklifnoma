@@ -142,4 +142,4 @@ function start() {
 }
 function stop() { clearInterval(timer); }
 
-module.exports = { start, stop, runOnce, processWedding, SLOTS };
+module.exports = { start, stop, runOnce, processWedding, slotsFor };
