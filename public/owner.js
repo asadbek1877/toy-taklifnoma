@@ -126,6 +126,36 @@
   ui.empty = (ico, txt) => h('div', { class: 'o-empty' }, h('div', null, ico), h('p', null, txt));
 
   // Pastki varaq (bottom sheet) — BackButton bilan yopiladi
+  let leafletP = null;
+  ns.loadLeaflet = () => leafletP || (leafletP = new Promise((res, rej) => {
+    if (window.L && window.L.map) return res();
+    document.head.append(h('link', { rel: 'stylesheet', href: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' }));
+    const s = h('script', { src: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' }); s.onload = res; s.onerror = () => { leafletP = null; rej(new Error('leaflet')); }; document.head.append(s);
+  }));
+  ui.timeInput = (get, set, title) => {
+    const val = h('span', null);
+    const paint = () => { val.textContent = get() || '--:--'; btn.classList.toggle('empty', !get()); };
+    const btn = h('button', { type: 'button', class: 'o-input o-time', onclick: () => open() }, val,
+      h('svg', { viewBox: '0 0 24 24', ns: true, class: 'o-ico' }, h('path', { d: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z', ns: true })));
+    function open() {
+      haptic('impact', 'light');
+      const [hh, mm] = (get() || '14:00').split(':').map(Number);
+      let H = hh, M = mm;
+      const col = (n, step, cur, onPick) => {
+        const items = []; for (let i = 0; i < n; i += step) items.push(i);
+        const el = h('div', { class: 'tw-col' }, h('div', { class: 'tw-pad' }), ...items.map((i) => h('div', { class: 'tw-it', dataset: { v: i } }, String(i).padStart(2, '0'))), h('div', { class: 'tw-pad' }));
+        let last = -1, timer = null;
+        const pick = () => { const idx = Math.round(el.scrollTop / 44); const v = items[Math.max(0, Math.min(items.length - 1, idx))]; [...el.querySelectorAll('.tw-it')].forEach((x) => x.classList.toggle('on', Number(x.dataset.v) === v)); if (v !== last) { if (last !== -1) haptic('impact', 'light'); last = v; onPick(v); } };
+        el.addEventListener('scroll', () => { clearTimeout(timer); timer = setTimeout(pick, 60); requestAnimationFrame(pick); }, { passive: true });
+        requestAnimationFrame(() => { const i = Math.max(0, items.indexOf(items.reduce((a, b) => (Math.abs(b - cur) < Math.abs(a - cur) ? b : a)))); el.scrollTop = i * 44; pick(); });
+        return el;
+      };
+      const wheel = h('div', { class: 'tw' }, col(24, 1, H, (v) => { H = v; }), h('span', { class: 'tw-sep' }, ':'), col(60, 5, M, (v) => { M = v; }), h('i', { class: 'tw-band' }));
+      const ctl = ui.sheet(title || t('o.time'), h('div', { class: 'o-col' }, wheel,
+        h('div', { class: 'o-row2' }, ui.btn(t('o.remove'), () => { set(null); paint(); ctl.close(); }, 'ghost'), ui.btn(t('o.ok'), () => { set(`${String(H).padStart(2, '0')}:${String(M).padStart(2, '0')}`); paint(); haptic('notify', 'success'); ctl.close(); }, 'primary'))));
+    }
+    paint(); return btn;
+  };
   ui.sheet = (title, content, opts = {}) => {
     const ov = h('div', { class: 'o-sheet-ov' });
     const closeBtn = h('button', { type: 'button', class: 'o-sheet-x', 'aria-label': 'Close' }, '✕');
@@ -262,8 +292,8 @@
         const g = h('input', { class: 'o-input', value: f.groom, maxlength: 60, placeholder: t('o.groomPh'), oninput: (e) => { f.groom = e.target.value; } });
         const b = h('input', { class: 'o-input', value: f.bride, maxlength: 60, placeholder: t('o.bridePh'), oninput: (e) => { f.bride = e.target.value; } });
         const d = h('input', { class: 'o-input', type: 'date', value: f.date, oninput: (e) => { f.date = e.target.value; } });
-        const c = h('input', { class: 'o-input', type: 'time', value: f.ceremonyTime, oninput: (e) => { f.ceremonyTime = e.target.value; } });
-        const q = h('input', { class: 'o-input', type: 'time', value: f.banquetTime, oninput: (e) => { f.banquetTime = e.target.value; } });
+        const c = ui.timeInput(() => f.ceremonyTime, (v) => { f.ceremonyTime = v || ''; }, t('o.nikoh'));
+        const q = ui.timeInput(() => f.banquetTime, (v) => { f.banquetTime = v || ''; }, t('o.banquet'));
         const err = h('p', { class: 'o-err', hidden: true }, t('o.wizRequired'));
         box.append(h('div', { class: 'o-wiz-hero' }, h('div', null, '💍'), h('h1', null, t('o.wizTitle')), h('p', null, t('o.wizSub'))), ui.card(
           ui.field(t('o.groom'), g), ui.field(t('o.bride'), b), ui.field(t('o.date'), d), h('div', { class: 'o-row2' }, ui.field(t('o.nikoh'), c), ui.field(t('o.banquet'), q)), err),
@@ -402,6 +432,21 @@
     "share-2": "<circle cx=\"18\" cy=\"5\" r=\"3\" /> <circle cx=\"6\" cy=\"12\" r=\"3\" /> <circle cx=\"18\" cy=\"19\" r=\"3\" /> <line x1=\"8.59\" x2=\"15.42\" y1=\"13.51\" y2=\"17.49\" /> <line x1=\"15.41\" x2=\"8.59\" y1=\"6.51\" y2=\"10.49\" />"
   };
   const lic = (name, size = 20, sw = 1.8) => { const e = document.createElement('span'); e.className = 'hm-ico'; e.innerHTML = `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[name]}</svg>`; return e; };
+  // Soat tiqillashi (Web Audio, fayl yo'q): juda past ovoz, sozlamalardan o'chiriladi
+  let actx = null;
+  ns.tickOn = () => { try { return localStorage.getItem('toy_tick') !== 'off'; } catch (e) { return true; } };
+  ns.tickSound = (minute) => {
+    if (!ns.tickOn() || document.hidden) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      actx = actx || new AC(); if (actx.state === 'suspended') actx.resume().catch(() => {});
+      const now = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter();
+      o.type = 'triangle'; o.frequency.setValueAtTime(minute ? 1250 : 2100, now); o.frequency.exponentialRampToValueAtTime(minute ? 700 : 1300, now + 0.05);
+      f.type = 'highpass'; f.frequency.value = 600;
+      g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(minute ? 0.06 : 0.035, now + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+      o.connect(f).connect(g).connect(actx.destination); o.start(now); o.stop(now + 0.08);
+    } catch (e) { /* ovoz muhim emas */ }
+  };
   const seenKey = 'toy_seen_ev';
   const getSeen = () => { try { return Number(localStorage.getItem(seenKey)) || 0; } catch (e) { return 0; } };
   const setSeen = (n) => { try { localStorage.setItem(seenKey, String(n)); } catch (e) { /* ixtiyoriy */ } };
@@ -439,7 +484,9 @@
       const days = Math.floor(diff / 86400000); diff -= days * 86400000;
       const hrs = Math.floor(diff / 3600000); diff -= hrs * 3600000;
       const mins = Math.floor(diff / 60000); diff -= mins * 60000;
-      cd.d.textContent = pad2(days); cd.h.textContent = pad2(hrs); cd.m.textContent = pad2(mins); cd.s.textContent = pad2(Math.floor(diff / 1000));
+      const put = (el, v) => { if (el.textContent === v) return; el.textContent = v; el.classList.remove('flip'); void el.offsetWidth; el.classList.add('flip'); };
+      put(cd.d, pad2(days)); put(cd.h, pad2(hrs)); put(cd.m, pad2(mins)); put(cd.s, pad2(Math.floor(diff / 1000)));
+      ns.tickSound(Math.floor(diff / 1000) === 0);
     };
     hero.append(h('button', { type: 'button', class: 'hm-edit', onclick: () => { haptic('impact', 'light'); go('content'); } }, h('span', null, lic('pen-line', 20, 1.8), t('o.hmEdit')), lic('chevron-right', 20, 2)),
       h('button', { type: 'button', class: 'hm-more', 'aria-label': 'More', onclick: () => wrap.querySelector('.hm-grid').scrollIntoView({ behavior: 'smooth', block: 'center' }) }, lic('chevron-down', 22, 2)));
@@ -473,7 +520,6 @@
     const statLabel = h('span', null, t('o.hmOpens'));
     const statTile = tile(lic('chart-column', 26, 1.6), h('div', { class: 'hm-val' }, tiles.stats, statLabel), t('o.tabStats'), () => go('stats'));
     wrap.append(h('div', { class: 'hm-grid' },
-      tile(ring, tiles.ready, t('o.readiness'), openChecklist),
       tile(lic('users', 26, 1.6), tiles.guests, t('o.tabGuests'), () => go('guests')),
       tile(lic('camera', 26, 1.6), tiles.content, t('o.tabContent'), () => go('content')),
       statTile));
@@ -608,9 +654,17 @@
         ui.toggle(t('o.nRsvp'), () => d.settings.notify.rsvp, (v) => { d.settings.notify.rsvp = v; touch(); }, t('o.nRsvpD')),
         ui.toggle(t('o.nOpened'), () => d.settings.notify.opened, (v) => { d.settings.notify.opened = v; touch(); }, t('o.nOpenedD'))));
 
-      const R = d.settings.reminders, rt = (k, key) => ui.toggle(t(key), () => R[k], (v) => { R[k] = v; touch(); });
-      wrap.append(ui.card(h('h3', { class: 'o-h3' }, '⏰ ' + t('o.remTitle')), h('p', { class: 'o-hint' }, t('o.remSub')),
-        rt('guestD7', 'o.rG7'), rt('guestD1', 'o.rG1'), rt('guestH3', 'o.rG3'), rt('pendingD14', 'o.rP14'), rt('pendingD7', 'o.rP7')));
+      const R = d.settings.reminders;
+      if (!Number.isFinite(R.guestDays)) R.guestDays = 1;
+      if (!Number.isFinite(R.pendingDays)) R.pendingDays = 7;
+      const dayPick = (key, label) => {
+        const opts = [0, 1, 2, 3, 7, 14].map((n) => ({ id: n, label: n ? t('o.remDays', { n }) : t('o.remOff') }));
+        const custom = h('input', { class: 'o-input o-days', type: 'number', min: 0, max: 60, inputmode: 'numeric', value: R[key], oninput: (e) => { const n = Math.min(60, Math.max(0, parseInt(e.target.value, 10) || 0)); R[key] = n; touch(); chips.querySelectorAll('.o-chip').forEach((c, i) => c.classList.toggle('on', opts[i].id === n)); } });
+        const chips = ui.chips(opts, () => R[key], (v) => { R[key] = v; custom.value = v; touch(); });
+        return h('div', { class: 'o-rem' }, h('b', null, label), chips, h('div', { class: 'o-inline' }, h('small', { class: 'o-hint' }, t('o.remCustom')), custom, h('small', { class: 'o-hint' }, t('o.remDaysWord'))));
+      };
+      wrap.append(ui.card(h('h3', { class: 'o-h3' }, '⏰ ' + t('o.remTitle')), h('p', { class: 'o-hint' }, t('o.remSub2')),
+        dayPick('guestDays', t('o.remGuest')), dayPick('pendingDays', t('o.remPending'))));
     }
 
     // Hammuallif
@@ -623,7 +677,8 @@
     }, 'ghost'));
     wrap.append(coh);
 
-    if (window.ToyMusic) wrap.append(ui.card(ui.toggle(t('o.music'), () => window.ToyMusic.get(), (v) => window.ToyMusic.set(v))));
+    wrap.append(ui.card(window.ToyMusic && ui.toggle(t('o.music'), () => window.ToyMusic.get(), (v) => window.ToyMusic.set(v)),
+      ui.toggle(t('o.tick'), () => ns.tickOn(), (v) => { try { localStorage.setItem('toy_tick', v ? 'on' : 'off'); } catch (e) { /* */ } }, t('o.tickD'))));
     // Til + xotira + chiqish
     const langRow = ui.chips(Core.LANGS.filter((l) => l !== 'ja').map((l) => ({ id: l, label: l.toUpperCase() })), () => Core.getLang(), (l) => { Core.setLang(l, true); });
     const pct = S.media.quota ? Math.min(100, Math.round((S.media.usage / S.media.quota) * 100)) : 0;

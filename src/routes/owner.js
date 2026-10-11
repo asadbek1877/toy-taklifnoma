@@ -242,6 +242,25 @@ router.post('/analytics', wrap(async (req, res) => {
   res.json(await store.analytics(m.wedding.id, Math.min(Math.max(parseInt(req.body.days, 10) || 14, 7), 60)));
 }));
 
+router.post('/resolve-map', wrap(async (req, res) => {
+  const m = await requireMember(req, res);
+  if (!m) return;
+  let url = String(req.body.url || '').trim().slice(0, 500);
+  const ok = (u) => { try { const x = new URL(u); return x.protocol === 'https:' && /(^|\.)(goo\.gl|google\.[a-z.]+|yandex\.[a-z.]+|ya\.cc)$/i.test(x.hostname); } catch (e) { return false; } };
+  if (!ok(url)) return res.status(400).json({ error: 'bad_url' });
+  try {
+    for (let i = 0; i < 5; i++) {
+      const r = await fetch(url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'Mozilla/5.0 (toygabot)' } });
+      const loc = r.headers.get('location');
+      if (!loc || r.status < 300 || r.status >= 400) break;
+      const next = new URL(loc, url).toString();
+      if (!ok(next)) break;
+      url = next;
+    }
+  } catch (e) { /* tarmoq: borini qaytaramiz */ }
+  res.json({ url });
+}));
+
 router.post('/activity', wrap(async (req, res) => {
   const m = await requireMember(req, res);
   if (!m) return;

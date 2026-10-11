@@ -284,3 +284,39 @@
 .hm-cd-t, .hm-cd-c small, .hm-tile-t span { color: rgba(255, 255, 255, 0.9); }
 .hm-ib { background: rgba(28, 18, 10, 0.38); border-color: rgba(255, 255, 255, 0.3); }
 .hm-link { color: #fff; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6); }
+
+/* ===== vaqt g'ildiragi ===== */
+.o-time { display: flex; align-items: center; justify-content: space-between; text-align: left; font-variant-numeric: tabular-nums; font-weight: 600; cursor: pointer; }
+.o-time.empty span { color: #a8968a; font-weight: 500; } .o-time .o-ico { width: 20px; height: 20px; color: #8a6a4a; }
+.tw { position: relative; display: flex; justify-content: center; align-items: center; gap: 6px; height: 220px; margin: 4px 0 8px; -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+.tw-col { width: 84px; height: 220px; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; position: relative; z-index: 1; overscroll-behavior: contain; }
+.tw-col::-webkit-scrollbar { display: none; }
+.tw-pad { height: 88px; }
+.tw-it { height: 44px; display: grid; place-items: center; scroll-snap-align: center; font-size: 22px; color: #a8968a; font-variant-numeric: tabular-nums; transition: color 0.2s, transform 0.2s; }
+.tw-it.on { color: #2e1f19; font-weight: 650; font-size: 26px; }
+.tw-sep { font-size: 26px; font-weight: 650; color: #2e1f19; position: relative; z-index: 1; }
+.tw-band { position: absolute; left: 12%; right: 12%; top: 50%; height: 44px; transform: translateY(-50%); border-radius: 14px; background: rgba(255, 255, 255, 0.7); border: 1px solid rgba(185, 138, 62, 0.25); box-shadow: inset 0 1px 0 #fff; z-index: 0; }
+/* xarita */
+.o-map { height: 240px; border-radius: 18px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.85); box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08); background: #eee6da; display: grid; place-items: center; color: var(--soft); font-size: 13px; }
+.o-map .leaflet-control-attribution { font-size: 9px; }
+.o-coord { font-size: 13px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.o-map-res { display: flex; flex-direction: column; gap: 4px; } .o-map-res:empty { display: none; }
+.o-map-hit { text-align: left; border: 0; background: rgba(255, 255, 255, 0.7); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--ink); }
+.o-inline { display: flex; gap: 8px; align-items: center; } .o-inline .o-input { flex: 1; min-width: 0; }
+.o-days { max-width: 84px; text-align: center; }
+.o-rem { display: flex; flex-direction: column; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(110, 80, 50, 0.1); } .o-rem:last-child { border-bottom: 0; } .o-rem b { font-size: 15px; }
+/* bosh ekran: 3 ta karta bir qatorda */
+.hm-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.hm-tile { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 12px; min-height: 0; }
+.hm-tile-t b { font-size: 22px; } .hm-tile-t span { font-size: 12px; }
+.hm-val { flex-direction: column; align-items: flex-start; gap: 0; } .hm-val span { font-size: 11px; opacity: 0.85; }
+/* hisoblagich: raqamlar silliq aylanadi */
+.hm-cd-c b { display: inline-block; will-change: transform, opacity; }
+.hm-cd-c b.flip { animation: cdFlip 0.55s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes cdFlip { 0% { transform: translate3d(0, -40%, 0) rotateX(70deg); opacity: 0; filter: blur(2px); } 60% { opacity: 1; filter: blur(0); } 100% { transform: none; opacity: 1; } }
+.hm-cd-row > span { animation: cdBlink 1s steps(1) infinite; } @keyframes cdBlink { 50% { opacity: 0.25; } }
+.hm-cd { position: relative; overflow: hidden; }
+.hm-cd::after { content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: linear-gradient(90deg, transparent, #e8c98a, transparent); transform-origin: left; animation: cdSweep 1s linear infinite; }
+@keyframes cdSweep { from { transform: scaleX(0); opacity: 0.9; } to { transform: scaleX(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .hm-cd-c b.flip, .hm-cd-row > span, .hm-cd::after { animation: none; } }
+.hm-cd-c { display: flex; flex-direction: column; align-items: center; }

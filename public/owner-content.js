@@ -6,7 +6,7 @@
   const D = () => S.draft;
   const rid = () => Math.random().toString(36).slice(2, 8);
 
-  const SUBS = ['basics', 'story', 'schedule', 'location', 'dress', 'menu', 'extra', 'media', 'rsvp', 'gift', 'sections'];
+  const SUBS = ['basics', 'location', 'menu', 'extra', 'gift'];
   let sub = 'basics';
 
   const move = (arr, i, dir) => { const j = i + dir; if (j < 0 || j >= arr.length) return false; [arr[i], arr[j]] = [arr[j], arr[i]]; return true; };
@@ -45,8 +45,8 @@
       const g = ui.input('groom', { maxlength: 60 }), b = ui.input('bride', { maxlength: 60 });
       g.addEventListener('input', ns.names); b.addEventListener('input', ns.names);
       const date = h('input', { class: 'o-input', type: 'date', value: d.date, oninput: (e) => { if (e.target.value) { d.date = e.target.value; recalcStarts(); ns.touch(); } } });
-      const nik = h('input', { class: 'o-input', type: 'time', value: d.ceremonyTime || '', oninput: (e) => { d.ceremonyTime = e.target.value || null; recalcStarts(); ns.touch(); } });
-      const ban = h('input', { class: 'o-input', type: 'time', value: d.banquetTime || '', oninput: (e) => { d.banquetTime = e.target.value || null; ns.touch(); } });
+      const nik = ui.timeInput(() => d.ceremonyTime, (v) => { d.ceremonyTime = v; recalcStarts(); ns.touch(); }, t('o.nikoh'));
+      const ban = ui.timeInput(() => d.banquetTime, (v) => { d.banquetTime = v; ns.touch(); }, t('o.banquet'));
       return h('div', { class: 'o-col' },
         ui.card(h('h3', { class: 'o-h3' }, t('o.heroPhoto')), photoPicker(() => c.hero.mediaId, (v) => { c.hero.mediaId = v; }, t('o.choosePhoto')), h('p', { class: 'o-hint' }, t('o.heroPhotoHint'))),
         ui.card(ui.field(t('o.groom'), g), ui.field(t('o.bride'), b), ui.field(t('o.date'), date), h('div', { class: 'o-row2' }, ui.field(t('o.nikoh'), nik), ui.field(t('o.banquet'), ban))),
@@ -91,10 +91,69 @@
 
     location() {
       const L = D().content.location;
-      const test = () => { const q = encodeURIComponent(L.mapQuery || L.address || L.name || ''); if (!q) return toast(t('o.fillLocation'), 'err'); const url = `https://www.google.com/maps?q=${q}`; if (Core.tg && Core.tg.openLink) Core.safe(() => Core.tg.openLink(url)); else window.open(url, '_blank'); };
-      return h('div', { class: 'o-col' }, ui.card(ui.field(t('o.venueName'), ui.input('content.location.name', { maxlength: 120 })), ui.field(t('o.address'), ui.input('content.location.address', { maxlength: 200 })),
-        ui.field(t('o.mapQuery'), ui.input('content.location.mapQuery', { maxlength: 200, placeholder: t('o.mapQueryPh') }), t('o.mapQueryHint')), ui.btn('🗺 ' + t('o.testMap'), test, 'ghost'),
-        ui.field(t('o.locNotes'), ui.text('content.location.notes', { rows: 3, maxlength: 400, placeholder: t('o.locNotesPh') }))));
+      const box = h('div', { class: 'o-col' });
+      const coordTxt = h('span', { class: 'o-coord' });
+      const paintCoord = () => { coordTxt.textContent = L.lat != null ? `📍 ${L.lat.toFixed(5)}, ${L.lng.toFixed(5)}` : t('o.mapNoPoint'); };
+      const mapEl = h('div', { class: 'o-map' });
+      let map = null, marker = null;
+      const setPoint = (lat, lng, fly) => {
+        L.lat = Math.round(lat * 1e6) / 1e6; L.lng = Math.round(lng * 1e6) / 1e6; ns.touch(); paintCoord();
+        if (map) { if (marker) marker.setLatLng([L.lat, L.lng]); else marker = window.L.marker([L.lat, L.lng], { draggable: true }).addTo(map).on('dragend', (e) => { const p = e.target.getLatLng(); setPoint(p.lat, p.lng); }); if (fly) map.setView([L.lat, L.lng], 16); }
+        haptic('impact', 'light');
+      };
+      ns.loadLeaflet().then(() => {
+        if (!mapEl.isConnected && !document.body.contains(box)) return;
+        const start = L.lat != null ? [L.lat, L.lng] : [41.3111, 69.2797]; // standart: Toshkent
+        map = window.L.map(mapEl, { zoomControl: true, attributionControl: true }).setView(start, L.lat != null ? 16 : 12);
+        window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+        if (L.lat != null) setPoint(L.lat, L.lng);
+        map.on('click', (e) => setPoint(e.latlng.lat, e.latlng.lng));
+        setTimeout(() => map.invalidateSize(), 300);
+      }).catch(() => { mapEl.textContent = t('o.mapLoadFail'); });
+
+      // Qidiruv (OpenStreetMap Nominatim)
+      const results = h('div', { class: 'o-map-res' });
+      const q = h('input', { class: 'o-input', placeholder: t('o.mapSearchPh'), maxlength: 120 });
+      let timer = null;
+      const search = async () => {
+        const v = q.value.trim(); clear(results); if (v.length < 3) return;
+        try {
+          const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=uz&accept-language=${Core.getLang()}&q=${encodeURIComponent(v)}`).then((x) => x.json());
+          if (!r.length) results.append(h('small', { class: 'o-hint' }, t('o.mapNothing')));
+          r.forEach((p) => results.append(h('button', { type: 'button', class: 'o-map-hit', onclick: () => { setPoint(Number(p.lat), Number(p.lon), true); if (!L.address) { L.address = p.display_name.slice(0, 200); ns.renderTab(); } clear(results); } }, p.display_name)));
+        } catch (e) { results.append(h('small', { class: 'o-hint' }, t('o.network'))); }
+      };
+      q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 600); });
+
+      // Yandex / Google havolasidan koordinata
+      const parse = (u) => {
+        const s = decodeURIComponent(u);
+        let m = s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || s.match(/[?&](?:q|query|daddr|destination)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+        if (m) return [Number(m[1]), Number(m[2])];
+        m = s.match(/[?&](?:pt|ll|whatshere\[point\])=(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (m) return [Number(m[2]), Number(m[1])]; // Yandex: uzunlik,kenglik
+        return null;
+      };
+      const link = h('input', { class: 'o-input', placeholder: t('o.mapLinkPh'), inputmode: 'url' });
+      const useLink = async () => {
+        const v = link.value.trim(); if (!v) return;
+        let p = parse(v);
+        if (!p) { try { const r = await api('/api/owner/resolve-map', { url: v }); p = parse(r.url); } catch (e) { /* */ } }
+        if (p) { setPoint(p[0], p[1], true); link.value = ''; toast(t('o.mapLinkOk')); } else toast(t('o.mapLinkBad'), 'err');
+      };
+      const openIn = (kind) => {
+        if (L.lat == null) return toast(t('o.mapNoPoint'), 'err');
+        const url = kind === 'y' ? `https://yandex.uz/maps/?pt=${L.lng},${L.lat}&z=17&l=map` : `https://www.google.com/maps/search/?api=1&query=${L.lat},${L.lng}`;
+        if (Core.tg && Core.tg.openLink) Core.tg.openLink(url); else window.open(url, '_blank');
+      };
+      paintCoord();
+      box.append(
+        ui.card(h('h3', { class: 'o-h3' }, '🗺 ' + t('o.mapTitle')), h('p', { class: 'o-hint' }, t('o.mapHint')), q, results, mapEl, coordTxt,
+          h('div', { class: 'o-row2' }, ui.btn('Yandex', () => openIn('y'), 'ghost small'), ui.btn('Google', () => openIn('g'), 'ghost small')),
+          ui.field(t('o.mapLink'), h('div', { class: 'o-inline' }, link, ui.btn(t('o.mapUse'), useLink, 'primary small')), t('o.mapLinkHint'))),
+        ui.card(ui.field(t('o.venueName'), ui.input('content.location.name', { maxlength: 120 })), ui.field(t('o.address'), ui.input('content.location.address', { maxlength: 200 })),
+          ui.field(t('o.locNotes'), ui.text('content.location.notes', { rows: 3, maxlength: 400, placeholder: t('o.locNotesPh') }))));
+      return box;
     },
 
     dress() {

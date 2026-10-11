@@ -17,13 +17,15 @@ const DAY = 24 * HOUR;
 const parse = (s, d) => { try { return s ? JSON.parse(s) : d; } catch (e) { return d; } };
 
 // slot: qachon (to'ygacha qolgan vaqt <= at) va qancha vaqt oynasida yuboriladi (kech qolsak ham ma'nosi yo'qolmasin)
-const SLOTS = {
-  guestD7: { at: 7 * DAY, window: 36 * HOUR, kind: 'guest', key: 'd7' },
-  guestD1: { at: 1 * DAY, window: 18 * HOUR, kind: 'guest', key: 'd1' },
-  guestH3: { at: 3 * HOUR, window: 3 * HOUR, kind: 'guest', key: 'h3' },
-  pendingD14: { at: 14 * DAY, window: 36 * HOUR, kind: 'pending', key: 'p14' },
-  pendingD7: { at: 7 * DAY, window: 36 * HOUR, kind: 'pending', key: 'p7' },
-};
+// Egasi tanlaydi: keladiganlarga N kun oldin, javob bermaganlarga M kun oldin (0 = o'chiq)
+function slotsFor(flags) {
+  const out = [];
+  const g = Number.isFinite(flags.guestDays) ? flags.guestDays : 1;
+  const p = Number.isFinite(flags.pendingDays) ? flags.pendingDays : 7;
+  if (g > 0) out.push({ at: g * DAY, window: g === 1 ? 18 * HOUR : 36 * HOUR, kind: 'guest', key: `g${g}`, days: g });
+  if (p > 0) out.push({ at: p * DAY, window: 36 * HOUR, kind: 'pending', key: `p${p}`, days: p });
+  return out;
+}
 
 const MONTHS = {
   uz: ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentyabr', 'oktyabr', 'noyabr', 'dekabr'],
@@ -39,15 +41,15 @@ function fmtDate(date, lang) {
 // Mehmonga ko'rinadigan matnlar (uz — lotin, Mini App bilan bir xil)
 const GUEST_TEXT = {
   uz: {
-    d7: (n) => `⏳ <b>${n}</b> to'yiga 7 kun qoldi!`, d1: (n) => `🎉 <b>${n}</b> to'yi — ertaga!`, h3: (n) => `⏰ <b>${n}</b> to'yi 3 soatdan keyin boshlanadi!`,
+    dn: (n, d) => `⏳ <b>${n}</b> to'yiga ${d} kun qoldi!`, d7: (n) => `⏳ <b>${n}</b> to'yiga 7 kun qoldi!`, d1: (n) => `🎉 <b>${n}</b> to'yi — ertaga!`, h3: (n) => `⏰ <b>${n}</b> to'yi 3 soatdan keyin boshlanadi!`,
     p: (n) => `💌 <b>${n}</b> to'yiga taklifnoma: iltimos, kelish-kelmasligingizni bildiring.`, open: 'Taklifnomani ochish 💌', when: 'Sana', where: 'Joy',
   },
   ru: {
-    d7: (n) => `⏳ До свадьбы <b>${n}</b> осталось 7 дней!`, d1: (n) => `🎉 Свадьба <b>${n}</b> — уже завтра!`, h3: (n) => `⏰ Свадьба <b>${n}</b> начнётся через 3 часа!`,
+    dn: (n, d) => `⏳ До свадьбы <b>${n}</b> осталось дней: ${d}!`, d7: (n) => `⏳ До свадьбы <b>${n}</b> осталось 7 дней!`, d1: (n) => `🎉 Свадьба <b>${n}</b> — уже завтра!`, h3: (n) => `⏰ Свадьба <b>${n}</b> начнётся через 3 часа!`,
     p: (n) => `💌 Приглашение на свадьбу <b>${n}</b>: пожалуйста, подтвердите, сможете ли прийти.`, open: 'Открыть приглашение 💌', when: 'Дата', where: 'Место',
   },
   ja: {
-    d7: (n) => `⏳ <b>${n}</b> の結婚式まであと7日です！`, d1: (n) => `🎉 <b>${n}</b> の結婚式は明日です！`, h3: (n) => `⏰ <b>${n}</b> の結婚式は3時間後に始まります！`,
+    dn: (n, d) => `⏳ <b>${n}</b> の結婚式まであと${d}日です！`, d7: (n) => `⏳ <b>${n}</b> の結婚式まであと7日です！`, d1: (n) => `🎉 <b>${n}</b> の結婚式は明日です！`, h3: (n) => `⏰ <b>${n}</b> の結婚式は3時間後に始まります！`,
     p: (n) => `💌 <b>${n}</b> の結婚式の招待状：ご出欠をお知らせください。`, open: '招待状を開く 💌', when: '日付', where: '会場',
   },
 };
@@ -57,7 +59,7 @@ function guestMessage(slot, w, lang, ctx) {
   const L = lang in GUEST_TEXT ? lang : 'uz';
   const t = GUEST_TEXT[L];
   const names = `${esc(w.groom)} &amp; ${esc(w.bride)}`;
-  const head = slot.kind === 'pending' ? t.p(names) : slot.key === 'd7' ? t.d7(names) : slot.key === 'd1' ? t.d1(names) : t.h3(names);
+  const head = slot.kind === 'pending' ? t.p(names) : slot.days === 1 ? t.d1(names) : t.dn(names, slot.days);
   let text = `${head}\n\n📅 ${t.when}: ${esc(fmtDate(w.wedding_date, L))}${w.ceremony_time ? ` · ${w.ceremony_time}` : ''}`;
   if (ctx.venue) text += `\n📍 ${t.where}: ${esc(ctx.venue)}`;
   return { text, button: t.open };
@@ -69,9 +71,8 @@ async function processWedding(w, now) {
   const until = new Date(w.starts_at).getTime() - now.getTime();
   if (until <= 0) return 0;
   const flags = (parse(w.settings, {}).reminders) || {};
-  const on = (k) => flags[k] !== false; // standart: yoqilgan
   let queued = 0;
-  const due = Object.entries(SLOTS).filter(([name, s]) => on(name) && until <= s.at && until > s.at - s.window);
+  const due = slotsFor(flags).map((s) => [s.key, s]).filter(([, s]) => until <= s.at && until > s.at - s.window);
   if (!due.length) return 0;
 
   const content = parse(w.content, {});
@@ -110,7 +111,7 @@ async function processWedding(w, now) {
         await enq(tgRow.tg_id, slot, text, mkButton(button, `g=${g.token}`));
       }
       if (pending.length && notify.wants(w, 'rsvp')) {
-        const days = slot.key === 'p14' ? 14 : 7;
+        const days = slot.days;
         const text = `📋 <b>${notify.title(w)}</b>\n\nТўйгача ${days} кун қолди. ${pending.length} та меҳмон ҳали жавоб бермаган.\n\nМеҳмонлар бўлимида ҳар бирининг шахсий ҳаволасини қайта юборишингиз мумкин.`;
         const members = await store.listMembers(w.id);
         for (const m of members) await enq(m.tg_id, slot, text, null);

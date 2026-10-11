@@ -95,12 +95,12 @@
     }
 
     function location() {
-      const L = c.location, q = encodeURIComponent(L.mapQuery || L.address || L.name || '');
+      const L = c.location, has = L.lat != null && L.lng != null, q = has ? `${L.lat},${L.lng}` : encodeURIComponent(L.mapQuery || L.address || L.name || '');
       const holder = h('div', { class: 'map-holder' });
       if (q) {
         // Xarita iframe'i faqat ko'rinishga kelganda (mobil tezlik)
         const io = new IntersectionObserver((es) => es.forEach((e) => {
-          if (e.isIntersecting) { holder.append(h('iframe', { src: `https://www.google.com/maps?q=${q}&output=embed`, loading: 'lazy', referrerpolicy: 'no-referrer-when-downgrade', title: 'Map' })); io.disconnect(); }
+          if (e.isIntersecting) { holder.append(h('iframe', { src: `https://www.google.com/maps?q=${q}&z=16&output=embed`, loading: 'lazy', referrerpolicy: 'no-referrer-when-downgrade', title: 'Map' })); io.disconnect(); }
         }), { root: scroll, rootMargin: '200px' });
         io.observe(holder); cleanups.push(() => io.disconnect());
       }
@@ -108,8 +108,8 @@
         L.name && h('p', { class: 'loc-name' }, L.name), L.address && h('p', { class: 'loc-addr' }, L.address), L.notes && h('p', { class: 'loc-notes' }, L.notes),
         q && holder,
         q && h('div', { class: 'btn-row' },
-          h('button', { class: 'btn ghost', type: 'button', onclick: () => openLink(`https://www.google.com/maps?q=${q}`) }, t('loc.google')),
-          h('button', { class: 'btn ghost', type: 'button', onclick: () => openLink(`https://yandex.com/maps/?text=${q}`) }, t('loc.yandex'))));
+          h('button', { class: 'btn ghost', type: 'button', onclick: () => openLink(has ? `https://www.google.com/maps/search/?api=1&query=${q}` : `https://www.google.com/maps?q=${q}`) }, t('loc.google')),
+          h('button', { class: 'btn ghost', type: 'button', onclick: () => openLink(has ? `https://yandex.uz/maps/?pt=${L.lng},${L.lat}&z=17&l=map` : `https://yandex.uz/maps/?text=${q}`) }, t('loc.yandex'))));
     }
 
     function dress() {
@@ -163,13 +163,12 @@
     const builders = { countdown, story, schedule, location, dress, menu, gallery, video };
     const hasData = {
       story: c.story.length, schedule: c.schedule.length, menu: c.menu.length,
-      location: c.location.name || c.location.address || c.location.mapQuery, dress: c.dress.text || c.dress.colors.length || c.dress.dos || c.dress.donts,
+      location: c.location.name || c.location.address || c.location.mapQuery || c.location.lat, dress: c.dress.text || c.dress.colors.length || c.dress.dos || c.dress.donts,
       gallery: c.gallery.length, video: c.video.mediaId, countdown: true,
     };
-    c.sections.filter((s) => s.on).forEach((s) => {
-      const el = s.id.startsWith('custom:') ? custom(s.id.slice(7)) : hasData[s.id] ? builders[s.id]() : null;
-      if (el) scroll.append(el);
-    });
+    // Qat'iy tartib: hisoblagich, manzil, menyu, galereya, video, keyin maxsus bo'limlar (hikoya/dastur/dress-code olib tashlangan)
+    ['countdown', 'location', 'menu', 'gallery', 'video'].forEach((id) => { const el = hasData[id] ? builders[id]() : null; if (el) scroll.append(el); });
+    c.custom.forEach((x) => { const el = custom(x.id); if (el) scroll.append(el); });
 
     // ---------- RSVP ----------
     const rs = c.rsvp;

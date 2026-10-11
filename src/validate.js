@@ -14,6 +14,12 @@ const mediaId = (v) => (typeof v === 'string' && MEDIA_ID.test(v) ? v : null);
 const hex = (v, fallback) => (typeof v === 'string' && HEX.test(v) ? v.toLowerCase() : fallback);
 const bool = (v, d) => (typeof v === 'boolean' ? v : d);
 
+// Xaritada belgilangan nuqta (lat/lng) — faqat haqiqiy koordinatalar
+function coords(lat, lng) {
+  const a = Number(lat), b = Number(lng);
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180 && (a || b) ? { lat: Math.round(a * 1e6) / 1e6, lng: Math.round(b * 1e6) / 1e6 } : { lat: null, lng: null };
+}
+
 function defaultSections(customIds = []) {
   return [
     ...['countdown', 'story', 'schedule', 'location', 'dress', 'menu', 'gallery', 'video'].map((id) => ({ id, on: id === 'countdown' || id === 'schedule' || id === 'location' })),
@@ -24,7 +30,7 @@ function defaultSections(customIds = []) {
 function defaultSettings() {
   return {
     notify: { rsvp: true, opened: true },
-    reminders: { guestD7: true, guestD1: true, guestH3: true, pendingD14: true, pendingD7: true },
+    reminders: { guestDays: 1, pendingDays: 7 }, // 0 = o'chiq; egasi o'zi necha kun oldin yuborilishini tanlaydi
   };
 }
 
@@ -71,7 +77,7 @@ function cleanContent(input) {
       time: TIME.test(x.time) ? x.time : '', title: clip(x.title, 100), text: clip(x.text, 300),
       icon: CATALOG.SCHEDULE_ICONS.includes(x.icon) ? x.icon : '✨',
     })).filter((x) => x.title),
-    location: { name: clip(loc.name, 120), address: clip(loc.address, 200), mapQuery: clip(loc.mapQuery, 200), notes: clip(loc.notes, 400) },
+    location: { name: clip(loc.name, 120), address: clip(loc.address, 200), mapQuery: clip(loc.mapQuery, 200), notes: clip(loc.notes, 400), ...coords(loc.lat, loc.lng) },
     dress: {
       text: clip(dress.text, 500),
       colors: arr(dress.colors, 6).filter((h) => typeof h === 'string' && HEX.test(h)).map((h) => h.toLowerCase()),
@@ -102,6 +108,7 @@ function cleanContent(input) {
   return { content, mediaIds: [...mediaIds] };
 }
 
+const days = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(Math.max(n, 0), 60) : d; };
 function cleanSettings(input) {
   const d = defaultSettings();
   const s = input && typeof input === 'object' ? input : {};
@@ -109,7 +116,7 @@ function cleanSettings(input) {
   const r = s.reminders && typeof s.reminders === 'object' ? s.reminders : {};
   return {
     notify: { rsvp: bool(n.rsvp, d.notify.rsvp), opened: bool(n.opened, d.notify.opened) },
-    reminders: Object.fromEntries(Object.keys(d.reminders).map((k) => [k, bool(r[k], d.reminders[k])])),
+    reminders: { guestDays: days(r.guestDays, d.reminders.guestDays), pendingDays: days(r.pendingDays, d.reminders.pendingDays) },
   };
 }
 
