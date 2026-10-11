@@ -304,10 +304,7 @@
   const TABS = [
     { id: 'home', ico: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z', k: 'o.tabHome' },
     { id: 'design', ico: 'M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4-4-8-9-8zM7.5 11a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm3-4a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm4 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2z', k: 'o.tabDesign' },
-    { id: 'content', ico: 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4', k: 'o.tabContent' },
-    { id: 'guests', ico: 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6 6 0 0 1 3.5 5.5', k: 'o.tabGuests' },
-    { id: 'stats', ico: 'M5 20V10M12 20V4M19 20v-7', k: 'o.tabStats' },
-    { id: 'more', ico: 'M5 12h.01M12 12h.01M19 12h.01', k: 'o.tabMore' },
+    { id: 'more', ico: 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4', k: 'o.tabMore' },
   ];
   let mainEl = null, tabbarEl = null, headEl = null;
 
@@ -577,6 +574,13 @@
     const d = S.draft, owner = S.role === 'owner';
     const wrap = h('div', { class: 'o-screen' });
     wrap.append(ui.title(t('o.moreTitle')));
+    const link = (path, label, id) => h('button', { type: 'button', class: 'o-link-row', onclick: () => { haptic('impact', 'light'); go(id); } },
+      h('svg', { viewBox: '0 0 24 24', ns: true, class: 'o-ico' }, h('path', { d: path, ns: true })), h('b', null, label),
+      h('svg', { viewBox: '0 0 24 24', ns: true, class: 'o-ico o-chev' }, h('path', { d: 'M9 5l7 7-7 7', ns: true })));
+    wrap.append(ui.card(
+      link('M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6 6 0 0 1 3.5 5.5', t('o.tabGuests'), 'guests'),
+      link('M5 20V10M12 20V4M19 20v-7', t('o.tabStats'), 'stats'),
+      link('M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4', t('o.tabContent'), 'content')));
 
     // Nashr + maxfiylik
     const pubCard = ui.card(h('h3', { class: 'o-h3' }, t('o.publishing')));

@@ -172,6 +172,16 @@ async function sendGreeting(chatId, caption, markup) {
 }
 const appUrl = (query) => `${webAppUrl.replace(/\/$/, '')}/?${query}`;
 
+// /start dan boshqa har qanday matn/buyruqqa ham javob beramiz — bot "jim" qolmasin
+bot.on('message', (msg) => {
+  if (!msg || !msg.chat || msg.chat.type !== 'private' || !webAppUrl) return;
+  if (!msg.text && !msg.photo && !msg.sticker && !msg.voice) return;
+  if (msg.text && /^\/(start|status|retry|ro'yxat)(@\w+)?(\s|$)/i.test(msg.text)) return; // ularning o'z ishlovchilari bor
+  if (msg.web_app_data) return;
+  const t = tr(msg);
+  bot.sendMessage(msg.chat.id, t.welcome, webAppButton(t.open, webAppUrl)).catch((e) => console.error('[fallback]', e.message));
+});
+
 // /start [w_<kod> | g_<token> | c_<token>]
 // Kod URL'ga ?w= / ?g= / ?c= bo'lib qo'shiladi — inline web_app tugmasida start_param ishlamaydi.
 // Parametrsiz /start — Mini App'ning o'zi ("to'y egasimisiz yoki mehmon?").
