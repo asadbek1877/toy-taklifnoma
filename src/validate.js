@@ -20,6 +20,12 @@ function coords(lat, lng) {
   return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180 && (a || b) ? { lat: Math.round(a * 1e6) / 1e6, lng: Math.round(b * 1e6) / 1e6 } : { lat: null, lng: null };
 }
 
+// To'lov havolasi: faqat https va ma'lum to'lov xizmatlari domenlari
+function payLink(v) {
+  const s = clip(v, 400);
+  try { const u = new URL(s); return u.protocol === 'https:' && /(^|\.)(click\.uz|payme\.uz|paycom\.uz|uzumbank\.uz|uzum\.uz|apelsin\.uz)$/i.test(u.hostname) ? u.toString() : ''; } catch (e) { return ''; }
+}
+
 function defaultSections(customIds = []) {
   return [
     ...['countdown', 'story', 'schedule', 'location', 'dress', 'menu', 'gallery', 'video'].map((id) => ({ id, on: id === 'countdown' || id === 'schedule' || id === 'location' })),
@@ -91,6 +97,7 @@ function cleanContent(input) {
     gift: {
       on: bool(gift.on, false),
       note: clip(gift.note, 300),
+      links: Object.fromEntries(['click', 'payme', 'uzum'].map((k) => [k, payLink(gift.links && gift.links[k])])),
       cards: arr(gift.cards, 3).map((x) => ({
         number: String((x && x.number) || '').replace(/\D/g, '').slice(0, 19),
         holder: clip(x && x.holder, 60),

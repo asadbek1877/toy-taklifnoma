@@ -167,8 +167,7 @@
       gallery: c.gallery.length, video: c.video.mediaId, countdown: true,
     };
     // Qat'iy tartib: hisoblagich, manzil, menyu, galereya, video, keyin maxsus bo'limlar (hikoya/dastur/dress-code olib tashlangan)
-    ['countdown', 'location', 'menu', 'gallery', 'video'].forEach((id) => { const el = hasData[id] ? builders[id]() : null; if (el) scroll.append(el); });
-    c.custom.forEach((x) => { const el = custom(x.id); if (el) scroll.append(el); });
+    ['countdown', 'location', 'gallery', 'video'].forEach((id) => { const el = hasData[id] ? builders[id]() : null; if (el) scroll.append(el); });
 
     // ---------- RSVP ----------
     const rs = c.rsvp;
@@ -251,10 +250,12 @@
         { id: 'payme', name: 'Payme', url: 'https://payme.uz/' },
         { id: 'uzum', name: 'Uzum Bank', url: 'https://uzumbank.uz/' },
       ];
+      const direct = (g.links || {});
       const openApp = async (a) => {
         haptic('impact', 'medium');
-        await copy(chosen); say('gift.copiedOpen');
-        setTimeout(() => { const tgw = window.Telegram && window.Telegram.WebApp; if (tgw && tgw.openLink) tgw.openLink(a.url); else window.open(a.url, '_blank', 'noopener'); }, 450);
+        const url = direct[a.id] || a.url; // egasining to'lov havolasi bo'lsa — to'g'ridan-to'g'ri o'tkazmaga
+        await copy(chosen); say(direct[a.id] ? 'gift.direct' : 'gift.copiedOpen');
+        setTimeout(() => { const tgw = window.Telegram && window.Telegram.WebApp; if (tgw && tgw.openLink) tgw.openLink(url); else window.open(url, '_blank', 'noopener'); }, 450);
       };
       return h('section', { class: 'sec gift rv', id: 'gift' }, h('h2', { class: 'sec-title' }, t('sec.gift')), h('div', { class: 'orn-wrap' }, ornament(tpl.ornament)),
         h('p', { class: 'gift-note' }, g.note || t('gift.note')),

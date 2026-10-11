@@ -6,8 +6,8 @@
   const D = () => S.draft;
   const rid = () => Math.random().toString(36).slice(2, 8);
 
-  const SUBS = ['basics', 'location', 'menu', 'extra', 'gift'];
-  let sub = 'basics';
+  const SUBS = ['location', 'gift'];
+  let sub = 'location';
 
   const move = (arr, i, dir) => { const j = i + dir; if (j < 0 || j >= arr.length) return false; [arr[i], arr[j]] = [arr[j], arr[i]]; return true; };
   const controls = (arr, i, redraw, onRemove) => h('div', { class: 'o-ctl' },
@@ -278,6 +278,10 @@
         const note = h('textarea', { class: 'o-input', rows: 3, maxlength: 300, placeholder: t('o.giftNotePh'), oninput: (e) => { g.note = e.target.value; ns.touch(); } });
         note.value = g.note || '';
         box.append(ui.card(ui.field(t('o.giftNote'), note, t('o.giftHint'))));
+        if (!g.links) g.links = {};
+        const linkIn = (id, name) => { const i = h('input', { class: 'o-input', inputmode: 'url', placeholder: 'https://...', value: g.links[id] || '', oninput: (e) => { g.links[id] = e.target.value.trim(); ns.touch(); } }); return ui.field(name, i); };
+        box.append(ui.card(h('h3', { class: 'o-h3' }, '⚡ ' + t('o.giftLinks')), h('p', { class: 'o-hint' }, t('o.giftLinksHint')),
+          linkIn('click', 'Click'), linkIn('payme', 'Payme'), linkIn('uzum', 'Uzum Bank')));
       };
       draw(); return box;
     },
@@ -295,6 +299,20 @@
       };
       draw(); return box;
     },
+  };
+
+  // Ism, sana, vaqt — alohida varaqda (Kontent bo'limidan olib tashlandi)
+  ns.openBasics = () => {
+    const d = D();
+    haptic('impact', 'light');
+    const g = ui.input('groom', { maxlength: 60 }), b = ui.input('bride', { maxlength: 60 });
+    const sync = () => { ns.names(); };
+    g.addEventListener('input', sync); b.addEventListener('input', sync);
+    const date = ui.dateInput(() => d.date, (v) => { if (v) { d.date = v; recalcStarts(); ns.touch(); } }, t('o.date'));
+    const nik = ui.timeInput(() => d.ceremonyTime, (v) => { d.ceremonyTime = v; recalcStarts(); ns.touch(); }, t('o.nikoh'));
+    const ban = ui.timeInput(() => d.banquetTime, (v) => { d.banquetTime = v; ns.touch(); }, t('o.banquet'));
+    ui.sheet(t('o.basicsTitle'), h('div', { class: 'o-col' }, ui.field(t('o.groom'), g), ui.field(t('o.bride'), b), ui.field(t('o.date'), date),
+      h('div', { class: 'o-row2' }, ui.field(t('o.nikoh'), nik), ui.field(t('o.banquet'), ban))), { onClose: () => { if (S.tab === 'home') ns.renderTab(); } });
   };
 
   ns.screens.content = () => {

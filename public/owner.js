@@ -473,16 +473,29 @@
   // Soat tiqillashi (Web Audio, fayl yo'q): juda past ovoz, sozlamalardan o'chiriladi
   let actx = null;
   ns.tickOn = () => { try { return localStorage.getItem('toy_tick') !== 'off'; } catch (e) { return true; } };
-  ns.tickSound = (minute) => {
+  let tickNoise = null, tickFlip = false;
+  ns.tickSound = () => {
     if (!ns.tickOn() || document.hidden) return;
     try {
       const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
       actx = actx || new AC(); if (actx.state === 'suspended') actx.resume().catch(() => {});
-      const now = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), f = actx.createBiquadFilter();
-      o.type = 'triangle'; o.frequency.setValueAtTime(minute ? 1250 : 2100, now); o.frequency.exponentialRampToValueAtTime(minute ? 700 : 1300, now + 0.05);
-      f.type = 'highpass'; f.frequency.value = 600;
-      g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(minute ? 0.06 : 0.035, now + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
-      o.connect(f).connect(g).connect(actx.destination); o.start(now); o.stop(now + 0.08);
+      if (!tickNoise) { // qisqa oq shovqin — mexanizm "tishi" urilishi
+        tickNoise = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.03), actx.sampleRate);
+        const d = tickNoise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 6);
+      }
+      const now = actx.currentTime + 0.005; tickFlip = !tickFlip;
+      const out = actx.createGain(); out.gain.value = 0.22; out.connect(actx.destination);
+      // 1. o'tkir "chik": shovqin -> tor polosali rezonans (metall)
+      const src = actx.createBufferSource(); src.buffer = tickNoise;
+      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = tickFlip ? 3600 : 2900; bp.Q.value = 9;
+      const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1400;
+      const g1 = actx.createGain(); g1.gain.setValueAtTime(0.9, now); g1.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
+      src.connect(hp).connect(bp).connect(g1).connect(out); src.start(now);
+      // 2. korpusning yog'och "taq"i: past, juda qisqa
+      const o = actx.createOscillator(), g2 = actx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(tickFlip ? 900 : 760, now); o.frequency.exponentialRampToValueAtTime(tickFlip ? 420 : 360, now + 0.02);
+      g2.gain.setValueAtTime(0.0001, now); g2.gain.exponentialRampToValueAtTime(0.35, now + 0.002); g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.028);
+      o.connect(g2).connect(out); o.start(now); o.stop(now + 0.04);
     } catch (e) { /* ovoz muhim emas */ }
   };
   const seenKey = 'toy_seen_ev';
@@ -509,7 +522,7 @@
         h('button', { type: 'button', class: 'hm-ib', 'aria-label': t('o.moreTitle'), onclick: () => { haptic('impact', 'light'); go('more'); } }, lic('settings', 20)))), h('div', { class: 'hm-spacer' }));
 
     // --- ismlar + sana ---
-    hero.append(h('div', { class: 'hm-names' }, h('h1', null, d.groom, ' & ', h('br'), d.bride), h('p', null, formatDate(d.date) + (d.ceremonyTime ? ` · ${d.ceremonyTime}` : ''))));
+    hero.append(h('button', { type: 'button', class: 'hm-names', onclick: () => ns.openBasics && ns.openBasics() }, h('h1', null, d.groom, ' & ', h('br'), d.bride), h('p', null, formatDate(d.date) + (d.ceremonyTime ? ` · ${d.ceremonyTime}` : ''))));
 
     // --- teskari sanoq (har soniya) ---
     const cd = { d: h('b'), h: h('b'), m: h('b'), s: h('b') };
@@ -524,7 +537,7 @@
       const mins = Math.floor(diff / 60000); diff -= mins * 60000;
       const put = (el, v) => { if (el.textContent === v) return; el.textContent = v; el.classList.remove('flip'); void el.offsetWidth; el.classList.add('flip'); };
       put(cd.d, pad2(days)); put(cd.h, pad2(hrs)); put(cd.m, pad2(mins)); put(cd.s, pad2(Math.floor(diff / 1000)));
-      ns.tickSound(Math.floor(diff / 1000) === 0);
+      ns.tickSound();
     };
     hero.append(h('button', { type: 'button', class: 'hm-edit', onclick: () => { haptic('impact', 'light'); go('content'); } }, h('span', null, lic('pen-line', 20, 1.8), t('o.hmEdit')), lic('chevron-right', 20, 2)),
       h('button', { type: 'button', class: 'hm-more', 'aria-label': 'More', onclick: () => wrap.querySelector('.hm-grid').scrollIntoView({ behavior: 'smooth', block: 'center' }) }, lic('chevron-down', 22, 2)));
@@ -673,6 +686,9 @@
     wrap.append(ui.card(
       link('M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6 6 0 0 1 3.5 5.5', t('o.tabGuests'), 'guests'),
       link('M5 20V10M12 20V4M19 20v-7', t('o.tabStats'), 'stats'),
+      h('button', { type: 'button', class: 'o-link-row', onclick: () => { haptic('impact', 'light'); ns.openBasics(); } },
+        h('svg', { viewBox: '0 0 24 24', ns: true, class: 'o-ico' }, h('path', { d: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', ns: true })), h('b', null, t('o.basicsTitle')),
+        h('svg', { viewBox: '0 0 24 24', ns: true, class: 'o-ico o-chev' }, h('path', { d: 'M9 5l7 7-7 7', ns: true }))),
       link('M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4', t('o.tabContent'), 'content'),
       link('M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4-4-8-9-8z', t('o.tabDesign'), 'design')));
 
