@@ -146,3 +146,5 @@ body.bg-blur #bg i { background: rgba(255, 244, 240, 0.2); }
 #v-welcome.out .wel-text { opacity: 0; transform: translate3d(0, -8px, 0); transition: opacity 0.4s ease, transform 0.4s ease; }
 #v-welcome.out .welcome-x { opacity: 0; transition: opacity 0.3s; }
 #v-welcome { transition: opacity 0.45s ease; } #v-welcome.out { opacity: 0; pointer-events: none; }
+
+body.in-gate .music-btn { display: none !important; }

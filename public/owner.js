@@ -132,6 +132,44 @@
     document.head.append(h('link', { rel: 'stylesheet', href: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' }));
     const s = h('script', { src: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' }); s.onload = res; s.onerror = () => { leafletP = null; rej(new Error('leaflet')); }; document.head.append(s);
   }));
+  // Sana tanlagich: tizim oynasi o'rniga o'zimizning shisha taqvim
+  ui.dateInput = (get, set, title) => {
+    const val = h('span', null);
+    const paint = () => { val.textContent = get() ? Core.formatDate(get()) : '—'; btn.classList.toggle('empty', !get()); };
+    const btn = h('button', { type: 'button', class: 'o-input o-time', onclick: () => open() }, val,
+      h('svg', { viewBox: '0 0 24 24', ns: true, class: 'o-ico' }, h('path', { d: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', ns: true })));
+    const iso = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    function open() {
+      haptic('impact', 'light');
+      const cur = get() ? new Date(`${get()}T12:00:00`) : new Date();
+      let Y = cur.getFullYear(), M = cur.getMonth();
+      const todayD = new Date(), todayIso = iso(todayD.getFullYear(), todayD.getMonth(), todayD.getDate());
+      const title2 = h('div', { class: 'cal-title' }), grid = h('div', { class: 'cal-grid' });
+      const ru = Core.getLang() === 'ru';
+      const MONTHS = ru ? ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'] : ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'];
+      const wd = ru ? ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] : ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
+      let ctl;
+      const draw = (dir) => {
+        title2.textContent = `${MONTHS[M]} ${Y}`;
+        clear(grid);
+        wd.forEach((w) => grid.append(h('span', { class: 'cal-wd' }, w)));
+        const first = (new Date(Y, M, 1).getDay() + 6) % 7, days = new Date(Y, M + 1, 0).getDate();
+        for (let i = 0; i < first; i++) grid.append(h('span'));
+        for (let d = 1; d <= days; d++) {
+          const v = iso(Y, M, d);
+          grid.append(h('button', { type: 'button', class: 'cal-d' + (v === get() ? ' on' : '') + (v === todayIso ? ' today' : ''), onclick: () => { set(v); paint(); haptic('notify', 'success'); setTimeout(() => ctl.close(), 160); } }, String(d)));
+        }
+        grid.classList.remove('l', 'r'); void grid.offsetWidth; if (dir) grid.classList.add(dir > 0 ? 'r' : 'l');
+      };
+      const nav = (d) => { M += d; if (M < 0) { M = 11; Y--; } if (M > 11) { M = 0; Y++; } haptic('impact', 'light'); draw(d); };
+      const arrow = (d, path) => h('button', { type: 'button', class: 'cal-nav', 'aria-label': d < 0 ? 'Prev' : 'Next', onclick: () => nav(d) }, h('svg', { viewBox: '0 0 24 24', ns: true, class: 'o-ico' }, h('path', { d: path, ns: true })));
+      draw(0);
+      ctl = ui.sheet(title || t('o.date'), h('div', { class: 'o-col' },
+        h('div', { class: 'cal-head' }, arrow(-1, 'M15 5l-7 7 7 7'), title2, arrow(1, 'M9 5l7 7-7 7')), grid,
+        h('div', { class: 'o-row2' }, ui.btn(t('o.cancel'), () => ctl.close(), 'ghost'), ui.btn(t('o.todayBtn'), () => { Y = todayD.getFullYear(); M = todayD.getMonth(); set(todayIso); paint(); haptic('notify', 'success'); setTimeout(() => ctl.close(), 160); }, 'primary'))));
+    }
+    paint(); return btn;
+  };
   ui.timeInput = (get, set, title) => {
     const val = h('span', null);
     const paint = () => { val.textContent = get() || '--:--'; btn.classList.toggle('empty', !get()); };
@@ -291,7 +329,7 @@
       if (step === 1) {
         const g = h('input', { class: 'o-input', value: f.groom, maxlength: 60, placeholder: t('o.groomPh'), oninput: (e) => { f.groom = e.target.value; } });
         const b = h('input', { class: 'o-input', value: f.bride, maxlength: 60, placeholder: t('o.bridePh'), oninput: (e) => { f.bride = e.target.value; } });
-        const d = h('input', { class: 'o-input', type: 'date', value: f.date, oninput: (e) => { f.date = e.target.value; } });
+        const d = ui.dateInput(() => f.date, (v) => { f.date = v || ''; }, t('o.date'));
         const c = ui.timeInput(() => f.ceremonyTime, (v) => { f.ceremonyTime = v || ''; }, t('o.nikoh'));
         const q = ui.timeInput(() => f.banquetTime, (v) => { f.banquetTime = v || ''; }, t('o.banquet'));
         const err = h('p', { class: 'o-err', hidden: true }, t('o.wizRequired'));

@@ -356,3 +356,11 @@
 @media (prefers-reduced-motion: reduce) { .intro-env .env, .intro-env .seal, .env-spark { animation: none; } }
 
 .gift-num { white-space: nowrap; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; font-size: clamp(16px, 5.4vw, 21px); letter-spacing: 0.06em; }
+
+/* muhr yarimlari: ota-muhr yashirilganda ham ko'rinib, ikkiga ajralib tushadi */
+.intro-env .env.opening .seal { opacity: 1; background: transparent; box-shadow: none; }
+.intro-env .env.opening .seal-half { opacity: 1; transition: none; }
+.intro-env .env.opening .seal-half.l { animation: sealL 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; transform: none; }
+.intro-env .env.opening .seal-half.r { animation: sealR 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; transform: none; }
+@keyframes sealL { 0% { opacity: 1; transform: none; } 55% { opacity: 1; } 100% { opacity: 0; transform: translate3d(-26px, 46px, 0) rotate(-28deg); } }
+@keyframes sealR { 0% { opacity: 1; transform: none; } 55% { opacity: 1; } 100% { opacity: 0; transform: translate3d(26px, 52px, 0) rotate(24deg); } }

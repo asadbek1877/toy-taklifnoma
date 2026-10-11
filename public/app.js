@@ -12,7 +12,7 @@
     VIEWS.forEach((v) => $('v-' + v).classList.toggle('is-active', v === name));
     document.body.classList.toggle('hide-lang', name === 'owner' || name === 'welcome' || name === 'gate');
     const bgOn = name === 'gate' || name === 'welcome' || name === 'role' || name === 'message' || name === 'cohost';
-    document.body.classList.toggle('has-bg', bgOn);
+    document.body.classList.toggle('has-bg', bgOn); document.body.classList.toggle('in-gate', name === 'gate');
     document.body.classList.toggle('bg-blur', name !== 'welcome');
     const bv = $('welcome-video');
     if (name === 'welcome') { const p = bv.play(); if (p && p.catch) p.catch(() => {}); }

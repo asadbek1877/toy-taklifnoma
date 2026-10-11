@@ -320,3 +320,20 @@
 @keyframes cdSweep { from { transform: scaleX(0); opacity: 0.9; } to { transform: scaleX(1); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .hm-cd-c b.flip, .hm-cd-row > span, .hm-cd::after { animation: none; } }
 .hm-cd-c { display: flex; flex-direction: column; align-items: center; }
+
+/* ===== shisha taqvim ===== */
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cal-title { flex: 1; text-align: center; font-family: 'Playfair Display', Georgia, serif; font-size: 22px; font-weight: 500; color: #2e1f19; }
+.cal-nav { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #5a4032; border: 1px solid rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.65); box-shadow: 0 3px 10px rgba(110, 80, 50, 0.1), inset 0 1px 0 #fff; transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
+.cal-nav:active { transform: scale(0.9); } .cal-nav .o-ico { width: 20px; height: 20px; stroke-width: 2.2; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px 2px; animation: calIn 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+.cal-grid.r { animation-name: calInR; } .cal-grid.l { animation-name: calInL; }
+@keyframes calIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes calInR { from { opacity: 0; transform: translate3d(18px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes calInL { from { opacity: 0; transform: translate3d(-18px, 0, 0); } to { opacity: 1; transform: none; } }
+.cal-wd { text-align: center; font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #a08b7a; padding: 6px 0 8px; }
+.cal-d { height: 44px; border: 0; border-radius: 50%; background: none; font-size: 17px; font-weight: 500; color: #2e1f19; font-variant-numeric: tabular-nums; transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.25s; position: relative; }
+.cal-d:active { transform: scale(0.88); background: rgba(185, 138, 62, 0.15); }
+.cal-d.today { color: #a8742a; font-weight: 700; box-shadow: inset 0 0 0 1.5px rgba(185, 138, 62, 0.55); }
+.cal-d.on { color: #fff; font-weight: 650; background: linear-gradient(180deg, #cfa869, #a77a3d 60%, #8a6128); box-shadow: 0 8px 18px rgba(138, 97, 40, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+@media (prefers-reduced-motion: reduce) { .cal-grid { animation: none; } }

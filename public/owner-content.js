@@ -44,7 +44,7 @@
       const d = D(), c = d.content;
       const g = ui.input('groom', { maxlength: 60 }), b = ui.input('bride', { maxlength: 60 });
       g.addEventListener('input', ns.names); b.addEventListener('input', ns.names);
-      const date = h('input', { class: 'o-input', type: 'date', value: d.date, oninput: (e) => { if (e.target.value) { d.date = e.target.value; recalcStarts(); ns.touch(); } } });
+      const date = ui.dateInput(() => d.date, (v) => { if (v) { d.date = v; recalcStarts(); ns.touch(); ns.names(); } }, t('o.date'));
       const nik = ui.timeInput(() => d.ceremonyTime, (v) => { d.ceremonyTime = v; recalcStarts(); ns.touch(); }, t('o.nikoh'));
       const ban = ui.timeInput(() => d.banquetTime, (v) => { d.banquetTime = v; ns.touch(); }, t('o.banquet'));
       return h('div', { class: 'o-col' },
