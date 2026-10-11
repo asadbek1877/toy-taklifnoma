@@ -255,3 +255,11 @@
 .o-sheet { transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
 .o-sheet-ov { transition: background-color 0.4s ease; }
 @media (prefers-reduced-motion: reduce) { .o-screen, .o-sheet { animation: none; transition: none; } }
+
+/* kirish animatsiyasi: elementlar ketma-ket silliq paydo bo'ladi */
+.o-screen { animation: none; will-change: auto; }
+.o-screen > *, .hm-hero > * { animation: oIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--n, 0) * 55ms); }
+.o-screen > :nth-child(1), .hm-hero > :nth-child(1) { --n: 0; } .o-screen > :nth-child(2), .hm-hero > :nth-child(2) { --n: 1; }
+.o-screen > :nth-child(3), .hm-hero > :nth-child(3) { --n: 2; } .o-screen > :nth-child(4), .hm-hero > :nth-child(4) { --n: 3; }
+.o-screen > :nth-child(5), .hm-hero > :nth-child(5) { --n: 4; } .o-screen > :nth-child(6) { --n: 5; } .o-screen > :nth-child(n+7) { --n: 6; }
+@media (prefers-reduced-motion: reduce) { .o-screen > *, .hm-hero > * { animation: none; } }

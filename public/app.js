@@ -15,8 +15,10 @@
     document.body.classList.toggle('has-bg', bgOn);
     document.body.classList.toggle('bg-blur', name !== 'welcome');
     const bv = $('welcome-video');
-    if (bgOn) { const p = bv.play(); if (p && p.catch) p.catch(() => {}); } else bv.pause();
-    musicSync(bgOn);
+    if (name === 'welcome') { const p = bv.play(); if (p && p.catch) p.catch(() => {}); }
+    else if (bgOn) setTimeout(() => { if (document.body.classList.contains('bg-blur')) bv.pause(); }, 900); // xira rasm yopgach video dekodlanmasin
+    else bv.pause();
+    if (name === 'invite') musicSync(false); else if (bgOn) musicSync(true);
     if (name !== 'invite') delete document.body.dataset.invdark;
   }
 
@@ -80,6 +82,10 @@
     musicOn = bgOn; paintMusic();
     if (bgOn && musicWanted) { const p = music.play(); if (p && p.catch) p.catch(() => {}); } else music.pause();
   }
+  window.ToyMusic = {
+    get: () => musicWanted,
+    set: (v) => { musicWanted = !!v; try { localStorage.setItem('toy_music', v ? 'on' : 'off'); } catch (e) { /* ixtiyoriy */ } paintMusic(); if (v) { musicOn = true; const p = music.play(); if (p && p.catch) p.catch(() => {}); } else music.pause(); },
+  };
   musicBtn.addEventListener('click', () => {
     musicWanted = !musicWanted; haptic('impact', 'light'); paintMusic();
     try { localStorage.setItem('toy_music', musicWanted ? 'on' : 'off'); } catch (e) { /* ixtiyoriy */ }
@@ -126,7 +132,7 @@
     if (leaving) return; leaving = true; haptic('impact', 'light');
     $('v-welcome').classList.add('out');
     document.body.classList.add('bg-blur');
-    setTimeout(() => { leaving = false; startOwner(); }, 450);
+    startOwner(true).finally(() => { leaving = false; });
   }
   $('welcome-x').addEventListener('click', leaveWelcome);
   $('wel-go').addEventListener('click', leaveWelcome);
@@ -145,22 +151,30 @@
   function loadScript(src) { return new Promise((res, rej) => { const s = h('script', { src }); s.onload = res; s.onerror = () => rej(new Error('load ' + src)); document.head.append(s); }); }
   function loadCss(href) { return new Promise((res) => { const l = h('link', { rel: 'stylesheet', href }); l.onload = res; l.onerror = res; document.head.append(l); }); }
 
-  async function startOwner() {
-    show('loading');
+  function loadOwnerCode() {
+    // Muharrir faqat egasiga yuklanadi (mehmonga og'ir kod yuborilmaydi)
+    // Tartib muhim: yadro (owner.js) birinchi, keyin unga qo'shiladigan modullar
+    ownerLoading = ownerLoading || (async () => {
+      await Promise.all([loadCss('owner.css?v=__V__'), loadScript('i18n-owner.js?v=__V__'), loadScript('owner.js?v=__V__')]);
+      await Promise.all([loadScript('owner-content.js?v=__V__'), loadScript('owner-guests.js?v=__V__')]);
+    })();
+    return ownerLoading;
+  }
+  // Kirish ekrani paytida fonda: kod + egasi ma'lumoti
+  function preloadOwner() {
+    loadOwnerCode().catch(() => { ownerLoading = null; });
+    if (Core.inTelegram && !window.__ownerMe) window.__ownerMe = { at: Date.now(), p: api('/api/owner/me', {}).catch(() => null) };
+  }
+  async function startOwner(quiet) {
+    if (!quiet) show('loading');
     try {
-      // Muharrir faqat egasiga yuklanadi (mehmonga og'ir kod yuborilmaydi)
-      // Tartib muhim: yadro (owner.js) birinchi, keyin unga qo'shiladigan modullar
-      ownerLoading = ownerLoading || (async () => {
-        await Promise.all([loadCss('owner.css?v=__V__'), loadScript('i18n-owner.js?v=__V__'), loadScript('owner.js?v=__V__')]);
-        await Promise.all([loadScript('owner-content.js?v=__V__'), loadScript('owner-guests.js?v=__V__')]);
-      })();
-      await ownerLoading;
+      await Promise.all([loadOwnerCode(), quiet ? new Promise((r) => setTimeout(r, 380)) : null]);
       show('owner');
       await window.OwnerApp.start({ root: $('v-owner'), onExit: showWelcome });
     } catch (err) {
       console.error('Owner start xatolik:', err);
       ownerLoading = null;
-      message('📡', 'msg.error.title', 'msg.error.text', { key: 'msg.retry', onClick: startOwner });
+      message('📡', 'msg.error.title', 'msg.error.text', { key: 'msg.retry', onClick: () => startOwner() });
     }
   }
 
@@ -191,6 +205,7 @@
     if (e.kind === 'w' || e.kind === 'g') return openInvite(e.kind, e.key);
     if (e.kind === 'c') return openCohost(e.key);
     if (gateDone()) showWelcome(); else showGate();
+    setTimeout(preloadOwner, 250);
   }
   boot();
   Core.rsvpQueue.flush(); // oldingi sessiyada yuborilmay qolgan javoblar bo'lsa — darhol yuboramiz

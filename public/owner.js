@@ -237,7 +237,10 @@
 
   // ================= MA'LUMOTNI YUKLASH =================
   async function loadMe() {
-    const me = await api('/api/owner/me', {});
+    // Oldindan so'ralgan javob (kirish ekrani paytida) bo'lsa — kutmasdan ishlatamiz
+    const pre = window.__ownerMe; window.__ownerMe = null;
+    let me = pre && Date.now() - pre.at < 90000 ? await pre.p : null;
+    if (!me) me = await api('/api/owner/me', {});
     S.me = me;
     if (!me.wedding) return;
     S.role = me.role; S.draft = me.wedding; S.prevHas = hasContent(me.wedding.content); S.version = me.wedding.version; S.links = me.links; S.members = me.members || []; S.media = { items: me.media.items, usage: me.media.usage, quota: me.media.quota };
@@ -613,6 +616,7 @@
     }, 'ghost'));
     wrap.append(coh);
 
+    if (window.ToyMusic) wrap.append(ui.card(ui.toggle(t('o.music'), () => window.ToyMusic.get(), (v) => window.ToyMusic.set(v))));
     // Til + xotira + chiqish
     const langRow = ui.chips(Core.LANGS.filter((l) => l !== 'ja').map((l) => ({ id: l, label: l.toUpperCase() })), () => Core.getLang(), (l) => { Core.setLang(l, true); });
     const pct = S.media.quota ? Math.min(100, Math.round((S.media.usage / S.media.quota) * 100)) : 0;
