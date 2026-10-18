@@ -326,8 +326,22 @@
       });
     };
     scroll.addEventListener('scroll', onScroll, { passive: true });
-    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { root: scroll, threshold: 0.12 });
-    scroll.querySelectorAll('.rv').forEach((el) => io.observe(el));
+    // har bir blok chap/o'ngdan navbat bilan paydo bo'ladi, o'qib bo'lingach tepaga ketganda so'nadi
+    const io = new IntersectionObserver((es) => es.forEach((e) => {
+      const el = e.target;
+      if (e.isIntersecting) { el.classList.remove('gone'); el.classList.add('in'); return; }
+      el.classList.remove('in');
+      el.classList.toggle('gone', !!e.rootBounds && e.boundingClientRect.top < e.rootBounds.top);
+    }), { root: scroll, threshold: 0.1, rootMargin: '-4% 0px -4% 0px' });
+    scroll.querySelectorAll('.rv').forEach((sec) => {
+      sec.classList.add('in');
+      [...sec.children].forEach((el, i) => {
+        el.classList.add('rv-i');
+        el.style.setProperty('--rx', i % 2 ? '44px' : '-44px');
+        el.style.setProperty('--d', Math.min(i * 0.12, 0.5) + 's');
+        io.observe(el);
+      });
+    });
     cleanups.push(() => { io.disconnect(); scroll.removeEventListener('scroll', onScroll); });
 
     // ---------- musiqa ----------

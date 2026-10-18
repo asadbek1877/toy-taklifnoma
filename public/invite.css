@@ -98,8 +98,12 @@
 .sec:nth-of-type(even)::before { content: ''; position: absolute; inset: 0 -100vw; background: rgba(var(--accent-rgb), 0.06); z-index: -1; }
 .sec-title { font-size: clamp(28px, 8.5vw, 40px); letter-spacing: 0.01em; }
 .tpl-frame .sec-title, .tpl-minimal .sec-title { text-transform: uppercase; letter-spacing: 0.14em; font-size: clamp(22px, 6.5vw, 30px); }
-.rv { opacity: 0; transform: translateY(30px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
-.rv.in, .is-preview .rv { opacity: 1; transform: none; }
+.rv-i { opacity: 0; transform: translateX(var(--rx, -44px)); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); transition-delay: var(--d, 0s); will-change: opacity, transform; }
+.rv-i.in { opacity: 1; transform: none; }
+.rv-i:not(.in) { transition-delay: 0s; transition-duration: 0.6s; }
+.rv-i.gone { transform: translateY(-26px); }
+.is-preview .rv-i { opacity: 1; transform: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { .rv-i, .rv-i.gone { opacity: 1; transform: none; transition: none; } }
 
 /* countdown */
 .cd { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 18px; }
