@@ -430,7 +430,33 @@
       } catch (e) { /* ovoz muhim emas */ }
     }
 
+    // uzun ismlar ekrandan chiqib ketmasin: sig'maguncha shrift kichraytiriladi (so'zlar ichidan bo'linmaydi)
+    const FIT = '.names .n1, .names .n2, .c2, .c4, .env-letter b, .foot-names';
+    const fitNames = () => {
+      root.querySelectorAll(FIT).forEach((el) => {
+        el.style.fontSize = '';
+        el.style.overflowWrap = 'normal'; // o'lchash paytida so'z ichidan bo'linmasin
+        const box = el.parentElement;
+        if (!box || !box.clientWidth) return;
+        const cs = getComputedStyle(box);
+        const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        let size = parseFloat(getComputedStyle(el).fontSize);
+        const min = size * 0.4;
+        for (let i = 0; i < 14 && size > min && Math.max(el.scrollWidth, el.offsetWidth) > avail - 2; i++) {
+          size *= Math.max(0.6, Math.min(0.96, (avail - 4) / Math.max(el.scrollWidth, el.offsetWidth)));
+          el.style.fontSize = size + 'px';
+        }
+        el.style.overflowWrap = '';
+      });
+    };
+    let fitRaf = 0;
+    const fitSoon = () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fitNames); };
+    window.addEventListener('resize', fitSoon);
+    cleanups.push(() => { cancelAnimationFrame(fitRaf); window.removeEventListener('resize', fitSoon); });
+
     container.replaceChildren(root);
+    fitSoon();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitSoon).catch(() => {});
     return { root, scroll, destroy() { cleanups.forEach((fn) => safe(fn)); root.remove(); } };
   }
 
