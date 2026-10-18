@@ -246,17 +246,26 @@
         return cardEl;
       });
       const APPS = [
-        { id: 'click', name: 'Click', url: 'https://my.click.uz/' },
-        { id: 'payme', name: 'Payme', url: 'https://payme.uz/' },
-        { id: 'uzum', name: 'Uzum Bank', url: 'https://uzumbank.uz/' },
-        { id: 'tbc', name: 'TBC Bank', url: 'https://tbcbank.uz/' },
+        { id: 'click', name: 'Click', url: 'https://my.click.uz/', scheme: 'click://' },
+        { id: 'payme', name: 'Payme', url: 'https://payme.uz/', scheme: 'payme://' },
+        { id: 'uzum', name: 'Uzum Bank', url: 'https://uzumbank.uz/', scheme: 'uzumbank://' },
+        { id: 'tbc', name: 'TBC Bank', url: 'https://tbcbank.uz/', scheme: 'tbcuz://' },
       ];
       const direct = (g.links || {});
       const openApp = async (a) => {
         haptic('impact', 'medium');
         const url = direct[a.id] || a.url; // egasining to'lov havolasi bo'lsa — to'g'ridan-to'g'ri o'tkazmaga
         await copy(chosen); say(direct[a.id] ? 'gift.direct' : 'gift.copiedOpen');
-        setTimeout(() => { const tgw = window.Telegram && window.Telegram.WebApp; if (tgw && tgw.openLink) tgw.openLink(url); else window.open(url, '_blank', 'noopener'); }, 450);
+        const web = () => { const tgw = window.Telegram && window.Telegram.WebApp; if (tgw && tgw.openLink) tgw.openLink(url); else window.open(url, '_blank', 'noopener'); };
+        // ilova sxemasi bilan to'g'ridan-to'g'ri ochishga urinish; ilova ochilmasa (sahifa yashirinmasa) — veb-havolaga qaytamiz
+        setTimeout(() => {
+          if (direct[a.id] || !a.scheme) return web();
+          let left = false;
+          const onHide = () => { if (document.hidden) left = true; };
+          document.addEventListener('visibilitychange', onHide);
+          try { window.location.href = a.scheme; } catch (e) { /* fallback below */ }
+          setTimeout(() => { document.removeEventListener('visibilitychange', onHide); if (!left && !document.hidden) web(); }, 1300);
+        }, 450);
       };
       return h('section', { class: 'sec gift rv', id: 'gift' }, h('h2', { class: 'sec-title' }, t('sec.gift')), h('div', { class: 'orn-wrap' }, ornament(tpl.ornament)),
         h('p', { class: 'gift-note' }, g.note || t('gift.note')),
